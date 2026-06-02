@@ -58,9 +58,9 @@
 ## E. Identity (soft gate — does not block ship)
 
 - [x] `[all]` Logo in README header (2026-06-02)
-- [ ] `[all]` Translations (polyglot-mcp, 7 languages) — in progress this treatment
-- [ ] `[org]` Landing page (@mcptoolshop/site-theme) — in progress this treatment
-- [ ] `[all]` GitHub repo metadata: description, homepage, topics — in progress this treatment
+- [x] `[all]` Translations (polyglot-mcp, 7 languages) (2026-06-02 — ja/zh/es/fr/hi/it/pt-BR)
+- [x] `[org]` Landing page + Starlight handbook (2026-06-02 — https://dogfood-lab.github.io/study-swarm/)
+- [x] `[all]` GitHub repo metadata: description, homepage, topics (2026-06-02 — 8 topics)
 
 ---
 
