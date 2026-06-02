@@ -33,12 +33,27 @@ roleos verify-citations <dispatch>
 
 The runner extracts a dispatch's citations, gates them through prism, and emits a receipt chained to prism's signed receipt — so a withdrawn or corrected citation is drift-detectable downstream.
 
-## Installing the package
+## The CLI
 
-The methodology ships as an npm package — [`@dogfood-lab/study-swarm`](https://www.npmjs.com/package/@dogfood-lab/study-swarm):
+The methodology ships as a zero-dependency npm package with a thin CLI — [`@dogfood-lab/study-swarm`](https://www.npmjs.com/package/@dogfood-lab/study-swarm):
 
 ```bash
-npm i @dogfood-lab/study-swarm
+npm i -g @dogfood-lab/study-swarm      # or: npx @dogfood-lab/study-swarm <command>
 ```
 
-It vendors the protocol (`PROTOCOL.md`), the README, and all 7 translations into your project — useful for pinning the exact version of the methodology a design decision was grounded against. There's no CLI yet; run the protocol by hand (above) or wire the two tools into your own dispatch flow. Published via OIDC Trusted Publishing with build provenance.
+| Command | What it does |
+|---|---|
+| `study-swarm protocol` | Print the locked protocol (the source of this page). |
+| `study-swarm new <slug>` | Scaffold `<slug>.dispatch.md` — the five-step skeleton to fill in. |
+| `study-swarm lint <file>` | Check the dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. |
+
+A typical loop:
+
+```bash
+study-swarm new my-decision                        # creates my-decision.dispatch.md
+# ...fill in the questions, run the research dispatch, write the findings...
+study-swarm lint my-decision.dispatch.md           # enforce the sourcing standard (Step 3)
+roleos verify-citations my-decision.dispatch.md    # model-based Step 4 (different family, via prism)
+```
+
+`lint` is deterministic and CI-safe (no model calls) — it covers Step 3's sourcing standard; the model-based Step 4 defers to the tools above. The package also vendors `PROTOCOL.md` + the README in 7 languages, useful for pinning the exact methodology version a decision was grounded against. Published via OIDC Trusted Publishing with build provenance.

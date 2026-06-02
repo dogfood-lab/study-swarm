@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@dogfood-lab/study-swarm"><img src="https://img.shields.io/npm/v/@dogfood-lab/study-swarm" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://dogfood-lab.github.io/study-swarm/"><img src="https://img.shields.io/badge/handbook-live-purple" alt="Handbook"></a>
   <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
@@ -57,6 +58,20 @@ Questa singola esecuzione è la tesi in miniatura: **"lenti" non correlate + un 
 
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — il verificatore in fase di esecuzione: instradamento differenziato per famiglia, ragionamento semplificato, arbitraggio multi-lente, un limite inferiore deterministico per il recupero dell'esistenza (arXiv → Crossref) e ricevute firmate.
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — fornisce `roleos verify-citations <dispatch>`, lo strumento che estrae le citazioni di un documento e le elabora tramite prism.
+
+## CLI
+
+```bash
+npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
+```
+
+| Comando | Funzione |
+|---|---|
+| `study-swarm protocol` | Stampa l’intero protocollo: le cinque fasi, la tabella di controllo e lo standard di riferimento. |
+| `study-swarm new <slug>` | Crea un file `<slug>.dispatch.md` con la struttura delle cinque fasi, da completare. |
+| `study-swarm lint <file>` | Verifica la sezione *Base di ricerca* di un documento rispetto allo standard di riferimento: ogni dato deve avere un autore, un anno e un identificatore univoco (arXiv / DOI / URL); le affermazioni generiche del tipo "gli studi dimostrano..." non sono accettate. In caso di violazioni, il comando termina con codice di uscita `1`, bloccando quindi il processo di CI. |
+
+`lint` è deterministico (non effettua chiamate al modello), quindi è sicuro da utilizzare in CI. Applica localmente lo **standard di riferimento della fase 3**; la verifica basata sul modello della **fase 4** viene comunque eseguita tramite [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
 ## In sintesi, perché funziona
 

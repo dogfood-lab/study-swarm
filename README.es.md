@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@dogfood-lab/study-swarm"><img src="https://img.shields.io/npm/v/@dogfood-lab/study-swarm" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://dogfood-lab.github.io/study-swarm/"><img src="https://img.shields.io/badge/handbook-live-purple" alt="Handbook"></a>
   <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
@@ -57,6 +58,20 @@ Puede ejecutar el protocolo manualmente: cualquier modelo de una familia diferen
 
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — el verificador en tiempo de ejecución: enrutamiento diferenciado por familia, sin razonamiento superfluo, adjudicación con múltiples lentes, un umbral determinista para la existencia de referencias (arXiv → Crossref) y comprobantes firmados.
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — proporciona `roleos verify-citations <dispatch>`, el programa que extrae las citas de un documento y las valida a través de prism.
+
+## CLI
+
+```bash
+npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
+```
+
+| Comando | Función |
+|---|---|
+| `study-swarm protocol` | Imprime el protocolo completo: los cinco pasos, la tabla de control y el estándar de búsqueda de fuentes. |
+| `study-swarm new <slug>` | Crea un archivo `<slug>.dispatch.md` con la estructura de los cinco pasos para que se complete. |
+| `study-swarm lint <file>` | Comprueba la *base de investigación* de un documento en relación con el estándar de búsqueda de fuentes; cada hallazgo debe tener un autor, un año y un identificador que se pueda resolver (arXiv / DOI / URL); se rechazan las afirmaciones vagas como "los estudios demuestran...". Si se detectan infracciones, el programa finaliza con el código `1`, lo que impide que se ejecute en el entorno de integración continua (CI). |
+
+`lint` es determinista (no realiza llamadas al modelo), por lo que es seguro para usar en el entorno de integración continua (CI). Aplica el **estándar de búsqueda de fuentes del paso 3** a nivel local; la verificación basada en el modelo del **paso 4** sigue dependiendo de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
 ## Por qué funciona, en pocas palabras
 

@@ -59,6 +59,20 @@ You can run the protocol by hand — any different-family model plus resolving t
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — the runtime verifier: family-different routing, reasoning-stripped, multi-lens adjudication, a deterministic retrieval existence floor (arXiv → Crossref), and signed receipts.
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — provides `roleos verify-citations <dispatch>`, the runner that extracts a dispatch's citations and gates them through prism.
 
+## CLI
+
+```bash
+npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
+```
+
+| Command | What it does |
+|---|---|
+| `study-swarm protocol` | Print the full protocol — the five steps, the halt table, the sourcing standard. |
+| `study-swarm new <slug>` | Scaffold a `<slug>.dispatch.md` with the five-step skeleton to fill in. |
+| `study-swarm lint <file>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. |
+
+`lint` is deterministic — zero model calls — so it's safe in CI. It enforces **Step 3's sourcing standard** locally; the model-based **Step 4** verification still defers to [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
+
 ## Why it works, in one breath
 
 **Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.

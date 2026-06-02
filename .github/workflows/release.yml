@@ -51,6 +51,9 @@ jobs:
             exit 1
           fi
 
+      - name: Smoke-test the CLI
+        run: node scripts/smoke.mjs
+
       - name: npm pack dry-run (verify shape)
         run: npm pack --dry-run
 

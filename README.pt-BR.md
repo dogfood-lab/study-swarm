@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@dogfood-lab/study-swarm"><img src="https://img.shields.io/npm/v/@dogfood-lab/study-swarm" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://dogfood-lab.github.io/study-swarm/"><img src="https://img.shields.io/badge/handbook-live-purple" alt="Handbook"></a>
   <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
@@ -57,6 +58,20 @@ Você pode executar o protocolo manualmente — qualquer modelo de família dife
 
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — o verificador em tempo de execução: roteamento diferenciado por família, sem inferências, adjudicação multi-lente, um limite determinístico de existência de recuperação (arXiv → Crossref) e recibos assinados.
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — fornece `roleos verify-citations <dispatch>`, o executor que extrai as citações de um documento e as valida através do prism.
+
+## CLI
+
+```bash
+npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
+```
+
+| Comando | O que faz |
+|---|---|
+| `study-swarm protocol` | Imprime o protocolo completo — as cinco etapas, a tabela de interrupção, o padrão de pesquisa. |
+| `study-swarm new <slug>` | Cria um arquivo `<slug>.dispatch.md` com a estrutura básica das cinco etapas para ser preenchido. |
+| `study-swarm lint <file>` | Verifica a *base de pesquisa* de um relatório em relação ao padrão de pesquisa — cada descoberta precisa de um autor, um ano e um identificador que possa ser resolvido (arXiv / DOI / URL); afirmações vagas do tipo "estudos mostram…" são rejeitadas. Sai com o código `1` em caso de violações, o que impede a execução no CI. |
+
+`lint` é determinístico — não faz chamadas ao modelo — portanto, é seguro para uso no CI. Ele aplica o **padrão de pesquisa da Etapa 3** localmente; a verificação baseada em modelo da **Etapa 4** ainda depende de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
 ## Por que funciona, em poucas palavras
 

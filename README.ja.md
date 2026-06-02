@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@dogfood-lab/study-swarm"><img src="https://img.shields.io/npm/v/@dogfood-lab/study-swarm" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://dogfood-lab.github.io/study-swarm/"><img src="https://img.shields.io/badge/handbook-live-purple" alt="Handbook"></a>
   <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
@@ -57,6 +58,20 @@
 
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — 実行時検証ツール：異なるモデルファミリー間でのルーティング、推論の簡略化、多角的な判断、決定的な検索による存在確認（arXiv → Crossref）、および署名されたレシートを提供。
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — `roleos verify-citations <dispatch>` を提供。このツールは、特定のドキュメントの引用を抽出し、それを prism を介して検証する。
+
+## CLI
+
+```bash
+npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
+```
+
+| コマンド | 機能 |
+|---|---|
+| `study-swarm protocol` | 完全なプロトコル（5つのステップ、停止テーブル、情報源の基準）を出力します。 |
+| `study-swarm new <slug>` | 5つのステップのテンプレートを含む`<slug>.dispatch.md`を作成し、内容を記述できるようにします。 |
+| `study-swarm lint <file>` | ディスパッチの「調査根拠」を情報源の基準と照合し、すべての調査結果について、著者、年、および解決可能な識別子（arXiv / DOI / URL）が必要です。「研究によると…」といった曖昧な表現は認められません。違反があった場合は、エラーコード`1`を返し、CIの実行を停止します。 |
+
+`lint`は決定的な処理であり、モデルへの呼び出しは行われないため、CI環境で安全に使用できます。ローカルで**ステップ3の情報源の基準**を適用します。モデルベースの**ステップ4**の検証は、引き続き[`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prismに委ねられます。
 
 ## なぜ機能するのか（簡潔に）
 

@@ -1,7 +1,7 @@
 {
   "name": "@dogfood-lab/study-swarm",
-  "version": "0.5.0",
-  "description": "Ground design decisions in cited research, then verify every citation with a different model family before it becomes canon — a research-grounded design protocol.",
+  "version": "0.6.0",
+  "description": "Ground design decisions in cited research, then verify every citation with a different model family before it becomes canon — a research-grounded design protocol, with a thin CLI.",
   "keywords": [
     "methodology",
     "llm",
@@ -22,7 +22,18 @@
   "bugs": {
     "url": "https://github.com/dogfood-lab/study-swarm/issues"
   },
+  "type": "module",
+  "bin": {
+    "study-swarm": "bin/study-swarm.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "verify": "node scripts/smoke.mjs"
+  },
   "files": [
+    "bin/",
     "README.md",
     "README.ja.md",
     "README.zh.md",
