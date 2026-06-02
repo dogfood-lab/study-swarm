@@ -1,0 +1,39 @@
+{
+  "name": "@dogfood-lab/study-swarm",
+  "version": "0.5.0",
+  "description": "Ground design decisions in cited research, then verify every citation with a different model family before it becomes canon — a research-grounded design protocol.",
+  "keywords": [
+    "methodology",
+    "llm",
+    "research",
+    "citations",
+    "verification",
+    "ai-agents",
+    "fact-checking",
+    "prompt-engineering"
+  ],
+  "license": "MIT",
+  "author": "mcp-tool-shop <64996768+mcp-tool-shop@users.noreply.github.com>",
+  "homepage": "https://dogfood-lab.github.io/study-swarm/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dogfood-lab/study-swarm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dogfood-lab/study-swarm/issues"
+  },
+  "files": [
+    "README.md",
+    "README.ja.md",
+    "README.zh.md",
+    "README.es.md",
+    "README.fr.md",
+    "README.hi.md",
+    "README.it.md",
+    "README.pt-BR.md",
+    "PROTOCOL.md",
+    "SECURITY.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ]
+}

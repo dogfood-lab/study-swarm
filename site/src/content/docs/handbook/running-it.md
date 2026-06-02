@@ -33,6 +33,12 @@ roleos verify-citations <dispatch>
 
 The runner extracts a dispatch's citations, gates them through prism, and emits a receipt chained to prism's signed receipt — so a withdrawn or corrected citation is drift-detectable downstream.
 
-## A note on installation
+## Installing the package
 
-This repository is the **methodology source**. The npm name [`@dogfood-lab/study-swarm`](https://www.npmjs.com/package/@dogfood-lab/study-swarm) is a reserved placeholder on Trusted-Publishing rails — there is no installable package to run *yet*. To use the protocol today, follow the steps above (by hand) or wire the two tools above into your own dispatch flow.
+The methodology ships as an npm package — [`@dogfood-lab/study-swarm`](https://www.npmjs.com/package/@dogfood-lab/study-swarm):
+
+```bash
+npm i @dogfood-lab/study-swarm
+```
+
+It vendors the protocol (`PROTOCOL.md`), the README, and all 7 translations into your project — useful for pinning the exact version of the methodology a design decision was grounded against. There's no CLI yet; run the protocol by hand (above) or wire the two tools into your own dispatch flow. Published via OIDC Trusted Publishing with build provenance.

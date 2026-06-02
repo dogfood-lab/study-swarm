@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — 2026-06-02
+## [0.5.0] — 2026-06-02
 
 ### Added
 
@@ -12,4 +12,4 @@ All notable changes to this project are documented here. The format is based on 
 - `SECURITY.md`, MIT `LICENSE`, project logo.
 - Landing page + Starlight handbook at <https://dogfood-lab.github.io/study-swarm/>.
 
-[1.0.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.0.0
+[0.5.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v0.5.0
