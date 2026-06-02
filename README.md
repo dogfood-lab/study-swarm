@@ -1,4 +1,16 @@
-# study-swarm
+<p align="center">
+  <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dogfood-lab/study-swarm/main/assets/study-swarm.png" alt="study-swarm" width="360">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  <a href="https://dogfood-lab.github.io/study-swarm/"><img src="https://img.shields.io/badge/handbook-live-purple" alt="Handbook"></a>
+  <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
+</p>
 
 **Ground design decisions in cited research — then verify the citations with a *different* model family before any of it becomes canon.**
 
@@ -50,8 +62,16 @@ You can run the protocol by hand — any different-family model plus resolving t
 
 **Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.
 
+## Security
+
+`study-swarm` is a documentation repository — Markdown and a logo. It ships no executable code and installs nothing from this repo. It touches no data, requires no permissions, and collects no telemetry; there are no secrets or credentials in the source. The methodology *describes* a workflow that uses web retrieval and model-based verification, but this repo does not implement or run it. See [SECURITY.md](SECURITY.md).
+
 ## Status
 
 A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
 
 MIT licensed.
+
+---
+
+<p align="center"><sub>Part of the <a href="https://github.com/dogfood-lab">dogfood-lab</a> family — methods &amp; showcases for building in the AI era. Built by <a href="https://mcp-tool-shop.github.io/">MCP Tool Shop</a>.</sub></p>

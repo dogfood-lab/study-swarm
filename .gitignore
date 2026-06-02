@@ -10,3 +10,7 @@ Thumbs.db
 # local backups / scratch
 *.bak
 *.bak-*
+site/.astro/
+site/dist/
+site/node_modules/
+.polyglot-cache.json
