@@ -15,8 +15,8 @@ The methodology *describes* a workflow that uses web retrieval and model-based v
 
 | Version | Supported |
 |---------|-----------|
-| 0.6.x   | ✅        |
-| < 0.6   | —         |
+| 1.x     | ✅        |
+| < 1.0   | —         |
 
 ## Reporting
 
