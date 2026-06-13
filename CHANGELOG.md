@@ -6,21 +6,31 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Security
 
-- `new` now rejects path separators and pure-dots slugs, so it can only write `<slug>.dispatch.md` in the current working directory (a slug like `../../x` previously wrote outside it).
+- `new` now sanitizes the slug to a single filename — path separators are replaced with `-` and pure-dots slugs are rejected — so it can only ever write `<slug>.dispatch.md` in the current working directory (a slug like `../../x` previously wrote outside it).
 - Pinned the GitHub Pages workflow's actions to commit SHAs, matching the release workflow.
+
+### Added
+
+- `lint` now also checks that each finding names an **author** before the year (Unicode-aware, so names like "Buçinca" count), completing the author + year + identifier sourcing standard the docs describe.
 
 ### Fixed
 
 - `lint`: an arXiv id's `YYMM` prefix is no longer mistaken for a publication year, so a finding with no spelled-out year is correctly flagged.
 - `lint`: the "studies show…" gesture check is now scoped to the *Research grounding* section and fires even when a citation sits on the same line.
+- `lint`: the *Research grounding* section is found by a heading whose text *ends* with that phrase, so a document title that merely mentions "research grounding" no longer shadows the real section.
+- `lint`: numbered lines inside fenced code blocks are no longer mistaken for findings.
+- `lint` on a directory, and `protocol` when `PROTOCOL.md` is unreadable, now report an actionable message instead of a raw `EISDIR`.
+- Light-mode handbook link colour darkened to meet WCAG AA contrast, and added a site favicon (previously a 404 on every page).
 
 ### Changed
 
 - `SECURITY.md` and the README Security section now describe the real shipped artifact — a thin, zero-dependency CLI — replacing stale "documentation repository / reserved placeholder / no executable code" language, and the Supported-versions table now lists the version line that actually ships.
+- `new` now notes when it had to sanitize a slug, so the created filename is never a silent surprise.
 
 ### Docs
 
 - Added arXiv identifiers to the Bansal 2021 and Wei 2022 citations so they meet the project's own sourcing standard.
+- README CLI section now shows the typical `new → lint → verify` loop.
 
 ## [0.6.0] — 2026-06-02
 

@@ -100,6 +100,29 @@ try {
     eq(r.code, 1, 'exit');
     if (!/missing a year/.test(r.stderr)) throw new Error('expected "missing a year"');
   });
+  check('lint is not shadowed by a title that mentions "research grounding" (exit 0)', () => {
+    const p = lintFile('shadow.dispatch.md', '# Retry policy: a research grounding exercise\n\n## Research grounding\n1. **A real finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint flags a finding with no author (exit 1)', () => {
+    const p = lintFile('noauthor.dispatch.md', '# d\n\n## Research grounding\n1. **A real finding.** 2024 (arXiv:2310.01798). Implication.\n');
+    const r = run(['lint', p]);
+    eq(r.code, 1, 'exit');
+    if (!/missing an author/.test(r.stderr)) throw new Error('expected "missing an author"');
+  });
+  check('lint accepts a non-ASCII author name (exit 0)', () => {
+    const p = lintFile('unicode.dispatch.md', '# d\n\n## Research grounding\n1. **Contrastive explanations help.** Buçinca et al. 2024 (arXiv:2410.04253). Implication.\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint ignores numbered lines inside a code fence (exit 0)', () => {
+    const p = lintFile('fence.dispatch.md', '# d\n\n## Research grounding\n1. **A real finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n\n```\n1. example output\n2. more output\n```\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint on a directory exits 2 with a friendly message', () => {
+    const r = run(['lint', work]);
+    eq(r.code, 2, 'exit');
+    if (!/is a directory/.test(r.stderr)) throw new Error('expected "is a directory"');
+  });
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

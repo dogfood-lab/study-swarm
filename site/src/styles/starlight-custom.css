@@ -3,3 +3,9 @@
   --sl-color-accent: #3b82f6;
   --sl-color-accent-high: #93c5fd;
 }
+
+/* Light mode maps prose link colour to --sl-color-accent; at #3b82f6 that is only
+   3.68:1 on white (below WCAG AA 4.5). Use a darker blue in light mode for AA contrast. */
+:root[data-theme='light'] {
+  --sl-color-accent: #1d4ed8;
+}

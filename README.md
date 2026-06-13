@@ -73,6 +73,15 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 
 `lint` is deterministic — zero model calls — so it's safe in CI. It enforces **Step 3's sourcing standard** locally; the model-based **Step 4** verification still defers to [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
+A typical loop:
+
+```bash
+study-swarm new my-decision                      # creates my-decision.dispatch.md
+# …fill in the questions, run the research dispatch, write the findings…
+study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard (Step 3)
+roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
+```
+
 ## Why it works, in one breath
 
 **Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.

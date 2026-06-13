@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // study-swarm — thin CLI for the research-grounded design protocol.
 // Zero runtime dependencies. Commands: protocol | new | lint | help | version.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -43,7 +43,8 @@ function fail(code, msg) {
 function cmdProtocol() {
   const p = resolve(__dirname, '../PROTOCOL.md');
   if (!existsSync(p)) fail(2, 'PROTOCOL.md not found in package');
-  process.stdout.write(readFileSync(p, 'utf8'));
+  try { process.stdout.write(readFileSync(p, 'utf8')); }
+  catch (err) { fail(2, `cannot read PROTOCOL.md in package: ${err && err.code ? err.code : err.message}`); }
 }
 
 const template = (slug) => `# Study-swarm dispatch: ${slug}
@@ -78,26 +79,39 @@ const template = (slug) => `# Study-swarm dispatch: ${slug}
 
 function cmdNew(slug) {
   if (!slug) fail(2, 'usage: study-swarm new <slug>');
-  // Reduce the slug to a single safe filename: strip a trailing .dispatch.md, then
-  // collapse anything that isn't a word char, dot, or hyphen to '-'. Path separators
-  // ('/' and '\') are NOT permitted — `new` writes ONE file in the current directory
-  // and must never traverse out of it. A pure-dots slug ('.', '..') is rejected.
-  const safe = String(slug).replace(/\.dispatch\.md$/i, '').replace(/[^\w.\-]/g, '-');
+  // Reduce the slug to a single safe filename: strip any trailing .dispatch.md (even if
+  // repeated), then collapse anything that isn't a word char, dot, or hyphen to '-'. Path
+  // separators ('/' and '\') are NOT permitted — `new` writes ONE file in the current
+  // directory and must never traverse out of it. A pure-dots slug ('.', '..') is rejected.
+  const stem = String(slug).replace(/(\.dispatch\.md)+$/i, '');
+  const safe = stem.replace(/[^\w.\-]/g, '-');
   if (!safe || /^\.+$/.test(safe)) {
     fail(2, `invalid slug "${slug}" — use letters, digits, '.', or '-' (the file stays in the current directory)`);
   }
   const out = `${safe}.dispatch.md`;
   if (existsSync(out)) fail(2, `refusing to overwrite existing ${out}`);
   writeFileSync(out, template(safe), 'utf8');
-  process.stdout.write(`Created ${out}\nFill it in, then:  study-swarm lint ${out}\n`);
+  const note = safe === stem ? '' : ` (slug sanitized to "${safe}")`;
+  process.stdout.write(`Created ${out}${note}\nFill it in, then:  study-swarm lint ${out}\n`);
 }
 
 function cmdLint(file) {
   if (!file) fail(2, 'usage: study-swarm lint <file>');
   if (!existsSync(file)) fail(2, `file not found: ${file}`);
-  const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+  if (statSync(file).isDirectory()) fail(2, `${file} is a directory — point lint at a .dispatch.md file.`);
+  let raw;
+  try { raw = readFileSync(file, 'utf8'); }
+  catch (err) { fail(2, `cannot read ${file}: ${err && err.code ? err.code : err.message}`); }
+  const lines = raw.split(/\r?\n/);
 
-  const start = lines.findIndex((l) => /^#{1,6}\s.*research grounding/i.test(l));
+  // Find the "Research grounding" heading — the one whose heading TEXT ends with that phrase,
+  // so a title like "...a research grounding exercise" above the real section can't shadow it.
+  // If several match, take the last (the real Step-3 section is conventionally last).
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^#{1,6}\s+(.*?)\s*$/);
+    if (h && /research grounding$/i.test(h[1])) start = i;
+  }
   if (start === -1) fail(1, 'no "Research grounding" section found — every dispatch needs one (Step 3).');
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
@@ -109,11 +123,20 @@ function cmdLint(file) {
   const ID = /(arxiv:\s*\d{4}\.\d{4,5}|10\.\d{4,9}\/\S+|https?:\/\/\S+)/i;
   const PLACEHOLDER = /arXiv:_{2,}|<finding>|<authors>|<year>|<implication>/i;
   const BANNED = /\b(studies show|research suggests|it'?s well[- ]established|well[- ]established that)\b/i;
+  // An author cite: a capitalized name (Unicode-aware, so "Buçinca" counts), optionally
+  // followed by "et al.", "&", "and", or further surnames, immediately before the year.
+  // Accepts "Huang et al. 2023", "Walters & Wilder 2023", "Panickssery, Bowman & Feng 2024";
+  // flags an author-less finding like "**Foo.** 2024 (arXiv:…)".
+  const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:\s*,?\s*(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+))*\s+\(?(?:19|20)\d{2}/u;
 
-  // Each numbered list item (with its continuation lines) is one finding.
+  // Split the section into findings (numbered items + continuation lines), ignoring fenced
+  // code blocks so a "1." inside a ``` example isn't mistaken for a finding.
   const findings = [];
   let cur = null;
+  let inFence = false;
   for (const l of section) {
+    if (/^\s*(```|~~~)/.test(l)) { inFence = !inFence; continue; }
+    if (inFence) continue;
     if (/^\s*\d+\.\s/.test(l)) { if (cur !== null) findings.push(cur); cur = l; }
     else if (cur !== null && l.trim()) cur += ' ' + l.trim();
   }
@@ -128,12 +151,15 @@ function cmdLint(file) {
     // (e.g. 2402 in arXiv:2402.01817) can't masquerade as a publication year.
     const fNoIds = f.replace(/arxiv:\s*\d{4}\.\d{4,5}/gi, '').replace(/10\.\d{4,9}\/\S+/g, '');
     if (!YEAR.test(fNoIds)) problems.push(`finding ${n}: missing a year (spell it out, e.g. "2024" — an arXiv id alone is not a year).`);
+    if (!AUTHOR.test(f)) problems.push(`finding ${n}: missing an author before the year (e.g. "Huang et al. 2023").`);
     if (!ID.test(f)) problems.push(`finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, or URL).`);
   });
-  // Scan only the Research grounding section, and flag the gesture itself: a finding
-  // should STATE its result, never "studies show…" — a co-located citation doesn't redeem it.
+  // Flag the banned gesture itself anywhere in the grounding section (outside code fences):
+  // a finding should STATE its result, never "studies show…" — a co-located citation doesn't redeem it.
+  let fence = false;
   section.forEach((l, idx) => {
-    if (BANNED.test(l)) {
+    if (/^\s*(```|~~~)/.test(l)) { fence = !fence; return; }
+    if (!fence && BANNED.test(l)) {
       problems.push(`line ${start + 2 + idx}: name the study (author + year + identifier), don't gesture: "${l.trim().slice(0, 56)}"`);
     }
   });
