@@ -26,6 +26,11 @@ EXIT CODES
   1  lint found sourcing violations
   2  usage or runtime error
 
+NOTE
+  lint checks citation FORM (Step 3: author + year + a resolvable arXiv/DOI/URL,
+  no "studies show…" gestures) — it does not judge whether a source is legitimate
+  or actually supports the claim. That is Step 4, below.
+
 Run a dispatch's model-based verification with: roleos verify-citations <file>
 Docs: https://dogfood-lab.github.io/study-swarm/
 `;
@@ -73,7 +78,14 @@ const template = (slug) => `# Study-swarm dispatch: ${slug}
 
 function cmdNew(slug) {
   if (!slug) fail(2, 'usage: study-swarm new <slug>');
-  const safe = String(slug).replace(/\.dispatch\.md$/i, '').replace(/[^\w.\-/]/g, '-');
+  // Reduce the slug to a single safe filename: strip a trailing .dispatch.md, then
+  // collapse anything that isn't a word char, dot, or hyphen to '-'. Path separators
+  // ('/' and '\') are NOT permitted — `new` writes ONE file in the current directory
+  // and must never traverse out of it. A pure-dots slug ('.', '..') is rejected.
+  const safe = String(slug).replace(/\.dispatch\.md$/i, '').replace(/[^\w.\-]/g, '-');
+  if (!safe || /^\.+$/.test(safe)) {
+    fail(2, `invalid slug "${slug}" — use letters, digits, '.', or '-' (the file stays in the current directory)`);
+  }
   const out = `${safe}.dispatch.md`;
   if (existsSync(out)) fail(2, `refusing to overwrite existing ${out}`);
   writeFileSync(out, template(safe), 'utf8');
@@ -112,12 +124,17 @@ function cmdLint(file) {
   findings.forEach((f, i) => {
     const n = i + 1;
     if (PLACEHOLDER.test(f)) problems.push(`finding ${n}: still has template placeholders — fill it in.`);
-    if (!YEAR.test(f)) problems.push(`finding ${n}: missing a year.`);
+    // Strip identifiers before the year check so an arXiv id's YYMM prefix
+    // (e.g. 2402 in arXiv:2402.01817) can't masquerade as a publication year.
+    const fNoIds = f.replace(/arxiv:\s*\d{4}\.\d{4,5}/gi, '').replace(/10\.\d{4,9}\/\S+/g, '');
+    if (!YEAR.test(fNoIds)) problems.push(`finding ${n}: missing a year (spell it out, e.g. "2024" — an arXiv id alone is not a year).`);
     if (!ID.test(f)) problems.push(`finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, or URL).`);
   });
-  lines.forEach((l, i) => {
-    if (BANNED.test(l) && !ID.test(l)) {
-      problems.push(`line ${i + 1}: name the study (author + year + identifier), don't gesture: "${l.trim().slice(0, 56)}"`);
+  // Scan only the Research grounding section, and flag the gesture itself: a finding
+  // should STATE its result, never "studies show…" — a co-located citation doesn't redeem it.
+  section.forEach((l, idx) => {
+    if (BANNED.test(l)) {
+      problems.push(`line ${start + 2 + idx}: name the study (author + year + identifier), don't gesture: "${l.trim().slice(0, 56)}"`);
     }
   });
 

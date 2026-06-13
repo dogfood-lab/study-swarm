@@ -45,7 +45,7 @@ As a test, the protocol was run against its own citations. Two decorrelated non-
 
 | Planted trap | Mistral | IBM Granite | Ground truth |
 |---|---|---|---|
-| Chain-of-thought prompting attributed to "Nakamura & Olsen" | missed | **caught** (misattributed → really Wei et al. 2022) | misattributed |
+| Chain-of-thought prompting attributed to "Nakamura & Olsen" | missed | **caught** (misattributed → really Wei et al. 2022, arXiv:2201.11903) | misattributed |
 | a fabricated "98% of errors removed, no oracle needed" paper | **caught** (fabricated) | **caught** (fabricated) | fabricated |
 
 Neither family caught both traps alone — but their **union caught 2/2**. A single judge would have shipped the misattribution. Separately, the retrieval oracle caught two *real* misattributions in our own design docs (papers cited under the wrong first author) that no parametric LLM could have flagged — and it correctly confirmed genuine 2026 papers that both LLMs false-flagged as fabricated simply because the papers postdate their training. That last point is the whole reason Step 4's existence check **must** be a retrieval oracle, never an LLM.
@@ -75,11 +75,11 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 
 ## Why it works, in one breath
 
-**Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.
+**Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.
 
 ## Security
 
-`study-swarm` is a documentation repository — Markdown and a logo. It ships no executable code and installs nothing from this repo. It touches no data, requires no permissions, and collects no telemetry; there are no secrets or credentials in the source. The methodology *describes* a workflow that uses web retrieval and model-based verification, but this repo does not implement or run it. See [SECURITY.md](SECURITY.md).
+`study-swarm` ships a **thin, zero-dependency CLI** (`study-swarm`) alongside the methodology. It makes **no network or model calls** and collects **no telemetry**; there are no secrets or credentials in the source. At runtime it only reads the file you pass to `lint` and writes a single `<slug>.dispatch.md` in the current directory for `new` (refusing to overwrite, and never outside the working directory). The model-based verification the methodology describes (Step 4) is run by the sibling tools, not by this package. See [SECURITY.md](SECURITY.md).
 
 ## Status
 

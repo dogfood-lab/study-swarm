@@ -12,7 +12,7 @@ study-swarm is a protocol you can run by hand. Two sibling tools make the verifi
 1. **Identify** 3–5 load-bearing questions.
 2. **Dispatch** one research agent per question, in parallel, demanding cited findings (titles, authors, years, URLs, one-sentence finding).
 3. **Synthesize** into a *Research grounding* section using the `N. **finding.** Authors year (id). implication.` template.
-4. **Verify** — give the bare citation claims (no reasoning) to **any model from a different family** than the one that synthesized them, and **resolve every arXiv ID / DOI yourself** to confirm existence. Apply the [halt table](./verification-gate/#the-halt-table).
+4. **Verify** — give the bare citation claims (no reasoning) to **any model from a different family** than the one that synthesized them, and **resolve every arXiv ID / DOI yourself** to confirm existence. Apply the [halt table](../verification-gate/#the-halt-table).
 5. **Connect** each design choice back to a finding by number.
 
 The only hard requirements: a *different family* for the groundedness check, and *retrieval* (not memory) for existence.

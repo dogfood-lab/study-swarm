@@ -43,7 +43,7 @@ The template does three things at once: states the finding, cites a verifiable s
 
 ## Step 4 — External verification gate
 
-A verifier of a **different model family**, reasoning-stripped, checks every citation before it informs the design. This step is large enough to have [its own page](./verification-gate/).
+A verifier of a **different model family**, reasoning-stripped, checks every citation before it informs the design. This step is large enough to have [its own page](../verification-gate/).
 
 ## Step 5 — Connect findings to architecture
 

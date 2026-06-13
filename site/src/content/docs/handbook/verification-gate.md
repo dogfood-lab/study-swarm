@@ -20,7 +20,7 @@ Step 4 is the heart of study-swarm. Before any finding informs the design, a ver
 - **Same-family judges self-prefer** — self-recognition correlates linearly with self-preference, so partial blinding doesn't help (Panickssery 2024); a disjoint-family panel is less biased at lower cost (Verga 2024).
 - **Hide the reasoning** — manipulated chain-of-thought alone can inflate a judge's false-positives dramatically (Khalifa 2026), and CoT is often post-hoc rationalization (Turpin 2023). The verifier sees the bare citation claim, never the "why."
 
-See [Research grounding](./research-grounding/) for the full citations.
+See [Research grounding](../research-grounding/) for the full citations.
 
 ## Ensemble: ≥3 decorrelated lenses
 

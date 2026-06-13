@@ -7,6 +7,7 @@ export const config: SiteConfig = {
   logoBadge: 'SS',
   brandName: 'study-swarm',
   repoUrl: 'https://github.com/dogfood-lab/study-swarm',
+  npmUrl: 'https://www.npmjs.com/package/@dogfood-lab/study-swarm',
   footerText:
     'MIT Licensed — part of <a href="https://github.com/dogfood-lab" style="color:var(--color-muted);text-decoration:underline">dogfood-lab</a>, built by <a href="https://mcp-tool-shop.github.io/" style="color:var(--color-muted);text-decoration:underline">MCP Tool Shop</a>',
 
@@ -28,9 +29,9 @@ export const config: SiteConfig = {
   sections: [
     {
       kind: 'features',
-      id: 'protocol',
+      id: 'why',
       title: 'Why it works',
-      subtitle: 'Three documented failure modes, each closed by evidence — not intuition.',
+      subtitle: 'Documented failure modes, each closed by evidence — not intuition.',
       features: [
         {
           title: 'Family-different verification',
@@ -52,7 +53,7 @@ export const config: SiteConfig = {
     },
     {
       kind: 'code-cards',
-      id: 'usage',
+      id: 'protocol',
       title: 'The protocol',
       cards: [
         {

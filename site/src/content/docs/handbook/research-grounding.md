@@ -43,7 +43,7 @@ As a test, the protocol was run against its own citations. Two decorrelated non-
 
 | Planted trap | Mistral | IBM Granite | Truth |
 |---|---|---|---|
-| CoT prompting attributed to "Nakamura & Olsen" | missed | **caught** | misattributed (really Wei et al. 2022) |
+| CoT prompting attributed to "Nakamura & Olsen" | missed | **caught** | misattributed (really Wei et al. 2022, arXiv:2201.11903) |
 | a fabricated "98% of errors removed" paper | **caught** | **caught** | fabricated |
 
 Neither family caught both alone — their **union caught 2/2**. A single judge would have shipped the misattribution. Meanwhile the retrieval oracle caught two *real* misattributions in adjacent design docs and correctly confirmed genuine 2026 papers that both LLMs false-flagged as fabricated (because the papers postdate their training) — which is exactly why the existence check must be a retrieval oracle, never an LLM.
