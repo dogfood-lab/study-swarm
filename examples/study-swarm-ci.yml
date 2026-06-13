@@ -1,0 +1,28 @@
+# Copy this into YOUR repo at .github/workflows/dispatches.yml to gate the sourcing
+# of every study-swarm dispatch on each pull request. It is a SAMPLE — it is not an
+# active workflow in the study-swarm repo itself.
+name: study-swarm lint
+
+on:
+  pull_request:
+    paths:
+      - '**/*.dispatch.md'
+      - '.github/workflows/dispatches.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Lint every dispatch under dispatches/ (a file, a dir, or '-' for stdin all work).
+      # Exit 1 on any sourcing violation fails the check. Add --json for machine-readable output.
+      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/

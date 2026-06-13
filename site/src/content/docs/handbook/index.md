@@ -25,6 +25,7 @@ It applies its own medicine. The protocol prescribes verifier-protected envelope
 - **[The verification gate](./verification-gate/)** — Step 4: the two-stage check, the halt table, and why a *different* family.
 - **[Research grounding](./research-grounding/)** — the evidence behind the design, and the proof it works.
 - **[Running it](./running-it/)** — by hand, or with `roleos verify-citations`.
+- **[Common failure modes](./failure-modes/)** — the failures the protocol exists to catch, and the step that catches each.
 
 ## When to reach for it
 

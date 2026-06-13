@@ -59,6 +59,8 @@ You can run the protocol by hand — any different-family model plus resolving t
 - **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — the runtime verifier: family-different routing, reasoning-stripped, multi-lens adjudication, a deterministic retrieval existence floor (arXiv → Crossref), and signed receipts.
 - **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — provides `roleos verify-citations <dispatch>`, the runner that extracts a dispatch's citations and gates them through prism.
 
+The handoff is the dispatch format itself: a finding written as `N. **finding.** Authors year (arXiv|DOI). implication.` — with **one resolvable identifier per finding** — is exactly what `roleos verify-citations` lifts and gates. A `lint`-clean dispatch hands off cleanly; a malformed citation is what the runner flags as unparsed. That contract is what `study-swarm lint` checks locally, so Step 3 and Step 4 agree on what a citation is.
+
 ## CLI
 
 ```bash
@@ -69,7 +71,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 |---|---|
 | `study-swarm protocol` | Print the full protocol — the five steps, the halt table, the sourcing standard. |
 | `study-swarm new <slug>` | Scaffold a `<slug>.dispatch.md` with the five-step skeleton to fill in. |
-| `study-swarm lint <file>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. |
+| `study-swarm lint [--json] <path…>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
 
 `lint` is deterministic — zero model calls — so it's safe in CI. It enforces **Step 3's sourcing standard** locally; the model-based **Step 4** verification still defers to [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
@@ -80,6 +82,32 @@ study-swarm new my-decision                      # creates my-decision.dispatch.
 # …fill in the questions, run the research dispatch, write the findings…
 study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard (Step 3)
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
+```
+
+A complete, lint-clean dispatch — study-swarm applied to its own design — ships in [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) as a worked reference.
+
+### Gate it in CI
+
+`lint` takes a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin, and `--json` emits a machine-readable report. Drop this into your repo to gate every dispatch's sourcing on each PR (a copy-paste sample also lives in [`examples/study-swarm-ci.yml`](examples/study-swarm-ci.yml)):
+
+```yaml
+# .github/workflows/dispatches.yml
+name: study-swarm lint
+on:
+  pull_request:
+    paths: ['**/*.dispatch.md', '.github/workflows/dispatches.yml']
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
 ```
 
 ## Why it works, in one breath

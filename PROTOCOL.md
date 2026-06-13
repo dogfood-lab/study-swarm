@@ -21,6 +21,15 @@ The cost of running it is one parallel dispatch and a few minutes of synthesis. 
 
 List the specific questions where empirical evidence would change the answer. Aim for 3–5. **Fewer is fine** when the decision is genuinely substantial — run with 1–2 agents; the decision-to-investigate governs invocation, the number of evidence-changing questions governs breadth. Do not manufacture questions to hit a count, and do not abort for being under three. More than ~6 → split into multiple passes.
 
+**A question is load-bearing if:**
+
+- you can picture **two different designs** that hinge on the answer;
+- the honest current answer is *"I think…"*, not *"evidence says…"*;
+- an **adjacent field** (HCI, SRE, compilers, databases) has probably already measured it;
+- getting it wrong ships a **known-broken default** (e.g. "explanations always help" — they can increase over-reliance on *wrong* AI).
+
+Worked decomposition: *"Should a retry reuse the previous output?"* splits into *"does context carryover cause sycophancy drift?"* and *"do explanations increase over-reliance on wrong answers?"* — two evidence-changing questions, not one opinion.
+
 ## Step 2 — Dispatch parallel research agents
 
 One agent per question, dispatched **in parallel** (a single batch). Each agent's prompt MUST include:
@@ -85,9 +94,28 @@ Example: *"Retry uses a fresh prompt without the previous output. (sycophancy mi
 
 ## Sourcing standard
 
-**A citation includes ALL of:** (1) author(s) — first author + "et al." inline is fine; (2) year; (3) paper title OR canonical identifier (arXiv:NNNN.NNNNN, DOI, RFC); (4) a direct URL to the source (not a summary or a social-media thread); (5) a one-sentence key finding in your own words.
+**A citation includes ALL of:** (1) author(s) — first author + "et al." inline is fine; (2) year; (3) a **resolvable identifier or direct URL** — an arXiv id (arXiv:NNNN.NNNNN), a DOI, an RFC number, or a direct link to the source (not a summary or a social-media thread); a paper title is welcome but optional; (4) a one-sentence key finding in your own words.
 
-**Not allowed:** "studies show…" / "research suggests…" / "it's well-established…" without naming the source; titles without authors or years; citations the research step did not actually surface.
+> `study-swarm lint` enforces exactly this FORM locally — author + year + a resolvable arXiv/DOI/URL, and no "studies show…" gestures. arXiv ids and DOIs are preferred over a bare URL because Step 4's retrieval oracle resolves them deterministically.
+
+**Not allowed:** "studies show…" / "research suggests…" / "it's well-established…" without naming the source; an identifier-less citation; citations the research step did not actually surface.
+
+## Common failure modes
+
+The patterns this protocol exists to catch — each with the step that catches it:
+
+| Failure | Symptom | Caught by |
+|---|---|---|
+| **Fabricated citation** | the id resolves to nothing | Step 4 retrieval oracle → dropped |
+| **Misattribution** | real paper, wrong author/year | Step 4 oracle → corrected once, else dropped |
+| **Groundedness gap** | the link resolves but the source doesn't say it | Step 4 groundedness lens (distinct from existence) |
+| **Self-grading** | the synthesizing model also "verifies" | Step 4 different-family rule |
+| **Postdated-paper false-flag** | an LLM calls a real 2026 paper fabricated | why existence MUST be retrieval, not recall |
+| **Question padding** | five thin questions, two actually evidence-changing | Step 1 ("don't manufacture to hit a count") |
+| **Orphan citation** | a finding never referenced by a Step-5 choice | Step 5 (citations without a connection are noise) |
+| **"Studies show…"** | a gesture with no source named | the sourcing standard / `lint` |
+
+A fuller version with corrective actions is in the [handbook](https://dogfood-lab.github.io/study-swarm/handbook/failure-modes/).
 
 ## The architecture this protocol enables
 

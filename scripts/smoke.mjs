@@ -3,7 +3,7 @@
 // Temp files are created under a throwaway os.tmpdir() directory and removed in `finally`,
 // so a failed/interrupted run never leaks scratch files into the working tree.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,10 +118,65 @@ try {
     const p = lintFile('fence.dispatch.md', '# d\n\n## Research grounding\n1. **A real finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n\n```\n1. example output\n2. more output\n```\n');
     eq(run(['lint', p]).code, 0, 'exit');
   });
-  check('lint on a directory exits 2 with a friendly message', () => {
-    const r = run(['lint', work]);
+  // --- new lint capabilities: --json, directories, stdin, the shipped example ---
+  check('lint --json on a clean file exits 0 and parses to ok:true', () => {
+    const p = lintFile('jsonok.dispatch.md', '# d\n\n## Research grounding\n1. **A finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 0, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (obj.ok !== true || obj.findingCount !== 1) throw new Error('bad json payload');
+  });
+  check('lint --json on a dirty file exits 1 with stable rule ids', () => {
+    const p = lintFile('jsonbad.dispatch.md', '# d\n\n## Research grounding\n1. **A finding.** 2024 (arXiv:2310.01798).\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (obj.ok !== false) throw new Error('expected ok:false');
+    if (!obj.problems.some((x) => x.rule === 'missing-author')) throw new Error('expected a missing-author rule id');
+  });
+  check('lint a directory of clean dispatches exits 0', () => {
+    const d = join(work, 'good-dir'); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'a.dispatch.md'), '# a\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    writeFileSync(join(d, 'b.dispatch.md'), '# b\n\n## Research grounding\n1. **G.** Rajan 2025 (arXiv:2511.16708). Impl.\n');
+    eq(run(['lint', d]).code, 0, 'exit');
+  });
+  check('lint a directory with one bad dispatch exits 1', () => {
+    const d = join(work, 'mixed-dir'); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'good.dispatch.md'), '# g\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    writeFileSync(join(d, 'bad.dispatch.md'), '# b\n\n## Research grounding\n1. **F.** 2024 (arXiv:2310.01798).\n');
+    eq(run(['lint', d]).code, 1, 'exit');
+  });
+  check('lint an empty directory exits 2', () => {
+    const d = join(work, 'empty-dir'); mkdirSync(d, { recursive: true });
+    const r = run(['lint', d]);
     eq(r.code, 2, 'exit');
-    if (!/is a directory/.test(r.stderr)) throw new Error('expected "is a directory"');
+    if (!/no \.dispatch\.md/.test(r.stderr)) throw new Error('expected "no .dispatch.md"');
+  });
+  check('lint reads a clean dispatch from stdin (exit 0)', () => {
+    const r = run(['lint', '-'], { input: '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n' });
+    eq(r.code, 0, 'exit');
+  });
+  check('lint reads a dirty dispatch from stdin (exit 1)', () => {
+    const r = run(['lint', '-'], { input: '# d\n\n## Research grounding\n1. **Studies show it.** Foo 2024 (arXiv:2310.01798).\n' });
+    eq(r.code, 1, 'exit');
+  });
+  check('new stamps methodology provenance', () => {
+    const r = run(['new', 'prov'], { cwd: work });
+    eq(r.code, 0, 'exit');
+    const body = readFileSync(join(work, 'prov.dispatch.md'), 'utf8');
+    if (!/study-swarm v\d+\.\d+\.\d+ · protocol-sha256:[0-9a-f]{16}/.test(body)) throw new Error('no provenance stamp');
+  });
+  check('the shipped worked example lints clean (exit 0)', () => {
+    const ex = resolve(__dirname, '../examples/study-swarm-self.dispatch.md');
+    eq(run(['lint', ex]).code, 0, 'exit');
+  });
+  check('the worked example satisfies the roleos handoff contract (one id per finding)', () => {
+    const ex = resolve(__dirname, '../examples/study-swarm-self.dispatch.md');
+    const r = run(['lint', '--json', ex]);
+    eq(r.code, 0, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (!obj.findings.length) throw new Error('no findings parsed');
+    for (const f of obj.findings) if (!f.identifier) throw new Error(`finding ${f.finding} has no resolvable identifier`);
   });
 } finally {
   rmSync(work, { recursive: true, force: true });

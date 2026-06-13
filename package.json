@@ -34,6 +34,7 @@
   },
   "files": [
     "bin/",
+    "examples/",
     "README.md",
     "README.ja.md",
     "README.zh.md",

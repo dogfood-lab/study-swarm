@@ -45,7 +45,7 @@ npm i -g @dogfood-lab/study-swarm      # or: npx @dogfood-lab/study-swarm <comma
 |---|---|
 | `study-swarm protocol` | Print the locked protocol (the source of this page). |
 | `study-swarm new <slug>` | Scaffold `<slug>.dispatch.md` — the five-step skeleton to fill in. |
-| `study-swarm lint <file>` | Check the dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. |
+| `study-swarm lint [--json] <path…>` | Check a dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
 
 A typical loop:
 
@@ -56,4 +56,32 @@ study-swarm lint my-decision.dispatch.md           # enforce the sourcing standa
 roleos verify-citations my-decision.dispatch.md    # model-based Step 4 (different family, via prism)
 ```
 
-`lint` is deterministic and CI-safe (no model calls) — it covers Step 3's sourcing standard; the model-based Step 4 defers to the tools above. The package also vendors `PROTOCOL.md` + the README in 7 languages, useful for pinning the exact methodology version a decision was grounded against. Published via OIDC Trusted Publishing with build provenance.
+`lint` is deterministic and CI-safe (no model calls) — it covers Step 3's sourcing standard; the model-based Step 4 defers to the tools above. The package also vendors `PROTOCOL.md` + the README in 7 languages, useful for pinning the exact methodology version a decision was grounded against — and `study-swarm new` stamps that version (and a hash of the protocol) into every scaffolded dispatch. Published via OIDC Trusted Publishing with build provenance.
+
+A complete, lint-clean dispatch — study-swarm applied to its own design — ships as [`examples/study-swarm-self.dispatch.md`](https://github.com/dogfood-lab/study-swarm/blob/main/examples/study-swarm-self.dispatch.md); read it as a worked reference for all five steps.
+
+## Gate it in CI
+
+`lint` exits `1` on any sourcing violation, so it gates a pull request directly. Point it at a directory to check a whole corpus, and use `--json` for inline annotations. Copy this into your repo (a ready sample also ships as `examples/study-swarm-ci.yml`):
+
+```yaml
+# .github/workflows/dispatches.yml
+name: study-swarm lint
+on:
+  pull_request:
+    paths: ['**/*.dispatch.md', '.github/workflows/dispatches.yml']
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+```
+
+The handoff to Step 4 is the dispatch format itself: a finding written `N. **finding.** Authors year (arXiv|DOI). implication.` — one resolvable identifier per finding — is exactly what `roleos verify-citations` extracts and gates. A `lint`-clean dispatch hands off cleanly.

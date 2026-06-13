@@ -15,6 +15,15 @@ List the specific questions where empirical evidence would change the answer.
 
 Aim for 3–5. **Fewer is fine** when the decision is genuinely substantial — run with 1–2 agents. The decision-to-investigate governs *invocation*; the number of evidence-changing questions governs *breadth*. Don't manufacture questions to hit a count, and don't abort for being under three. More than ~6 → split into multiple passes.
 
+A question is **load-bearing** if:
+
+- you can picture **two different designs** that hinge on the answer;
+- the honest current answer is *"I think…"*, not *"evidence says…"*;
+- an **adjacent field** (HCI, SRE, compilers, databases) has probably already measured it;
+- getting it wrong ships a **known-broken default**.
+
+Worked decomposition: *"Should a retry reuse the previous output?"* splits into *"does context carryover cause sycophancy drift?"* and *"do explanations increase over-reliance on wrong answers?"* — two evidence-changing questions, not one opinion.
+
 ## Step 2 — Dispatch parallel research agents
 
 One agent per question, dispatched **in parallel** (a single batch). Each agent's prompt must demand:

@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format is based on 
 ### Added
 
 - `lint` now also checks that each finding names an **author** before the year (Unicode-aware, so names like "Buçinca" count), completing the author + year + identifier sourcing standard the docs describe.
+- `lint --json` emits a machine-readable report (stable `rule` ids + line numbers) for CI annotations and downstream tools.
+- `lint` accepts **multiple paths, a directory** (linted recursively for `*.dispatch.md`), or **`-` for stdin** — so `study-swarm lint dispatches/` gates a whole corpus and a pre-commit hook can pipe a staged file.
+- On a clean lint, the CLI now names the deferred Step-4 next step (`roleos verify-citations`), so a clean form-check isn't mistaken for verified.
+- `new` stamps methodology provenance into each scaffolded dispatch (`study-swarm vX.Y.Z · protocol-sha256:… · created:…`), fulfilling the "pin the methodology version" promise.
+- Shipped a worked, lint-clean reference dispatch (`examples/study-swarm-self.dispatch.md`) and a copy-paste CI sample (`examples/study-swarm-ci.yml`); both are in the npm tarball.
 
 ### Fixed
 
@@ -30,7 +35,9 @@ All notable changes to this project are documented here. The format is based on 
 ### Docs
 
 - Added arXiv identifiers to the Bansal 2021 and Wei 2022 citations so they meet the project's own sourcing standard.
-- README CLI section now shows the typical `new → lint → verify` loop.
+- README CLI section now shows the typical `new → lint → verify` loop, a "Gate it in CI" recipe, and the Step-3→Step-4 handoff contract.
+- Corrected the PROTOCOL.md sourcing standard so it matches what `lint` enforces (a resolvable identifier **or** a direct URL, not "title AND a separate URL" — the repo's own examples cite a bare arXiv id).
+- New handbook page **Common failure modes** (symptom → catching step → fix); Step-1 "is this question load-bearing?" heuristics in PROTOCOL.md and the handbook; the `new` template now embeds a worked example finding + selection hint.
 
 ## [0.6.0] — 2026-06-02
 
