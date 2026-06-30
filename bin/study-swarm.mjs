@@ -54,7 +54,7 @@ function fail(code, msg) {
 // Short hash of the vendored PROTOCOL.md, so a scaffolded dispatch records the exact
 // methodology version it was authored against (the package vendors PROTOCOL.md for this).
 function protocolHash() {
-  try { return createHash('sha256').update(readFileSync(PROTOCOL_PATH)).digest('hex').slice(0, 16); }
+  try { return createHash('sha256').update(normText(readFileSync(PROTOCOL_PATH, 'utf8'))).digest('hex').slice(0, 16); }
   catch { return 'unknown'; }
 }
 
@@ -275,13 +275,19 @@ const LOCK_SCHEMA = 'dispatch.lock/v1';
 // Self-describing digest "sha256-<base64>" — the W3C Subresource Integrity form: algorithm-
 // prefixed (so it's algorithm-agile) and used fail-closed on mismatch (L9; lock dispatch finding 38).
 function sriBytes(buf) { return 'sha256-' + createHash('sha256').update(buf).digest('base64'); }
-function sriString(str) { return sriBytes(Buffer.from(str, 'utf8')); }
+// Normalize TEXT before hashing so the same content hashes identically across platforms — strip a
+// BOM, fold CRLF/CR -> LF, NFC-normalize. Without this, a CRLF working tree (Windows) and an LF
+// checkout (git/CI) produce different hashes — the exact cross-platform drift our Q2 findings warn
+// about (RFC 8259 BOM, UAX #15 NFC, and CRLF/LF). Applied to every text input that gets hashed.
+function normText(s) { s = String(s); if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1); return s.replace(/\r\n?/g, '\n').normalize('NFC'); }
+function sriText(str) { return sriBytes(Buffer.from(normText(str), 'utf8')); }
 
 // RFC 8785 (JCS) canonical JSON, for the structured JSON the CLI assembles ITSELF (the tool
 // surface and the lock body): NFC-normalize strings, sort object keys by UTF-16 code unit (JS
 // default string sort), no inter-token whitespace, ECMAScript-shortest numbers, UTF-8 (L4).
-// The byte-exact PROMPT is deliberately NOT canonicalized — its raw bytes are what the model
-// conditioned on, so they are hashed directly (L3; JWS/DSSE hash-known-bytes rule, findings 12/23).
+// The PROMPT is NOT JCS-restructured — it is the literal string the model conditioned on, so it is
+// hashed as text (L3; JWS/DSSE hash-known-bytes rule, findings 12/23) under the SAME newline/BOM/NFC
+// normalization (normText) so the same prompt hashes identically across platforms (findings 10/11).
 function jcs(value) {
   const ser = (v) => {
     if (v === null) return 'null';
@@ -291,11 +297,11 @@ function jcs(value) {
       if (!Number.isFinite(v)) throw new Error('JCS: non-finite number not allowed');
       return JSON.stringify(v); // ECMAScript Number->String shortest round-trip
     }
-    if (t === 'string') return JSON.stringify(v.normalize('NFC'));
+    if (t === 'string') return JSON.stringify(normText(v));
     if (Array.isArray(v)) return '[' + v.map(ser).join(',') + ']';
     if (t === 'object') {
       return '{' + Object.keys(v).sort()
-        .map((k) => JSON.stringify(k.normalize('NFC')) + ':' + ser(v[k])).join(',') + '}';
+        .map((k) => JSON.stringify(normText(k)) + ':' + ser(v[k])).join(',') + '}';
     }
     throw new Error(`JCS: unsupported type ${t}`);
   };
@@ -311,8 +317,8 @@ function lockPathFor(dispatch) {
 
 // Build the lock object from the dispatch bytes + the harness-emitted orchestration record.
 function buildLockObject(dispatchPath, orchestration) {
-  const dispatchBytes = readFileSync(dispatchPath);
-  const protocolBytes = readFileSync(PROTOCOL_PATH);
+  const dispatchText = readFileSync(dispatchPath, 'utf8');
+  const protocolText = readFileSync(PROTOCOL_PATH, 'utf8');
   if (!orchestration || !Array.isArray(orchestration.steps) || orchestration.steps.length === 0) {
     fail(2, 'orchestration record has no non-empty "steps" array');
   }
@@ -324,7 +330,7 @@ function buildLockObject(dispatchPath, orchestration) {
     const rec = {
       question_id: String(need('question_id')),
       resolved_model: String(need('resolved_model')),       // L6 — the resolved id, never an alias
-      prompt_sha256: sriString(String(need('prompt'))),     // L3 — raw bytes, not canonicalized
+      prompt_sha256: sriText(String(need('prompt'))),       // L3 — text-normalized (LF/NFC/BOM), not JCS-restructured
       tool_schema_sha256: jcsDigest(need('tool_schema')),   // L5 — canonicalized tool surface
     };
     if (s.schema_dialect) rec.schema_dialect = String(s.schema_dialect); // L5 — dialect is contract
@@ -332,14 +338,14 @@ function buildLockObject(dispatchPath, orchestration) {
     // L7 — output hash for DRIFT DETECTION only (not determinism). The harness may ship the raw
     // output (the CLI hashes it) OR a pre-computed output_sha256 (large outputs needn't be shipped).
     if (typeof s.output_sha256 === 'string') rec.output_sha256 = s.output_sha256;
-    else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriString(s.output) : jcsDigest(s.output);
+    else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output);
     return rec;
   });
   const lock = {
     schema: LOCK_SCHEMA,
     study_swarm_version: VERSION,
-    protocol_sha256: sriBytes(protocolBytes),  // pins the methodology version
-    dispatch_sha256: sriBytes(dispatchBytes),  // pins the dispatch text
+    protocol_sha256: sriText(protocolText),  // pins the methodology version (text-normalized)
+    dispatch_sha256: sriText(dispatchText),  // pins the dispatch text (text-normalized)
     steps,
   };
   if (orchestration.verification && typeof orchestration.verification === 'object') {

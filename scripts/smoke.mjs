@@ -270,6 +270,21 @@ try {
     const d2 = join(empty, 'x.dispatch.md'); writeFileSync(d2, DISPATCH_TEXT);
     eq(run(['lock', '--verify', d2]).code, 2, 'exit');
   });
+  check('lock --verify is line-ending invariant (CRLF dispatch verifies an LF-built lock)', () => {
+    buildClean();                                          // LF fixtures -> lock built from LF
+    writeFileSync(dPath, readFileSync(dPath, 'utf8').replace(/\n/g, '\r\n')); // same content, CRLF
+    eq(run(['lock', '--verify', dPath, '--from', orchPath]).code, 0, 'exit'); // must STILL pass
+  });
+  check('lock prompt hashing is newline-normalized (CRLF prompt hashes == LF prompt)', () => {
+    writeFileSync(dPath, DISPATCH_TEXT);
+    const lf = baseOrch(); lf.steps[0].prompt = 'line A\nline B';
+    writeFileSync(orchPath, JSON.stringify(lf)); run(['lock', dPath, '--from', orchPath]);
+    const lfHash = JSON.parse(readFileSync(lockJsonPath, 'utf8')).steps[0].prompt_sha256;
+    const crlf = baseOrch(); crlf.steps[0].prompt = 'line A\r\nline B';
+    writeFileSync(orchPath, JSON.stringify(crlf)); run(['lock', dPath, '--from', orchPath]);
+    const crlfHash = JSON.parse(readFileSync(lockJsonPath, 'utf8')).steps[0].prompt_sha256;
+    if (lfHash !== crlfHash) throw new Error(`prompt hash not newline-invariant: ${lfHash} != ${crlfHash}`);
+  });
   check('the shipped example lock verifies clean against its orchestration (exit 0)', () => {
     const exD = resolve(__dirname, '../examples/study-swarm-lock.dispatch.md');
     const exO = resolve(__dirname, '../examples/study-swarm-lock.orchestration.json');

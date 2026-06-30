@@ -1,4 +1,4 @@
-<!-- study-swarm v1.2.0 · protocol-sha256:c509f90dcabd254b · created:2026-06-29 -->
+<!-- study-swarm v1.2.0 · protocol-sha256:4cfba7e8f7ef0915 · created:2026-06-29 -->
 # Study-swarm dispatch: dispatch.lock.json (the PIN_PER_STEP feature)
 
 > **Design dispatch.** This grounds the design of `dispatch.lock.json` — a per-dispatch lockfile that
@@ -122,8 +122,8 @@ Each choice traces to findings by number. The shape:
 
 - **L1 — One lock per dispatch; the lock IS the dispatch's content-address.** `lock_sha256` binds every per-step record and the verifier block together, so a replay cannot stitch a step from one dispatch onto another. (findings 4, 13, 17, 18)
 - **L2 — The harness emits the record; the CLI canonicalizes + hashes + validates it.** This producer/verifier split is universal across the provenance literature, and it is what keeps the CLI zero-dependency, network-free, and deterministic — it never calls a model. (findings 17, 19, 21, 22)
-- **L3 — Hash the byte-exact prompt bytes directly; do NOT canonicalize the prompt.** The prompt is the literal string the model conditioned on; normalizing it would pin bytes the agent never saw. *(You might expect JCS on the prompt too — we deliberately don't, by the JWS/DSSE hash-known-bytes rule.)* (findings 12, 23)
-- **L4 — JCS-canonicalize the structured JSON (tool surface, lock body) after NFC-normalizing strings, with no BOM.** This is the only way the same dispatch hashes identically on Windows, macOS, and Linux. (findings 9, 10, 11)
+- **L3 — Hash the prompt as normalized text, not JCS-restructured JSON.** The prompt is the literal string the model conditioned on, so it is hashed directly rather than canonicalized as JSON (the JWS/DSSE hash-known-bytes rule) — under one necessary text normalization (BOM strip + CRLF→LF + NFC), without which the same prompt hashes differently across platforms. (findings 12, 23; 10, 11)
+- **L4 — Normalize every text input before hashing (BOM strip + CRLF→LF + NFC), and JCS-canonicalize the structured JSON (tool surface, lock body).** This is the only way the same dispatch hashes identically on Windows, macOS, and Linux — the prompt, the dispatch text, `PROTOCOL.md`, and every JSON string value all pass through it. (findings 9, 10, 11) *(CI caught a real CRLF drift here when an early build hashed raw `PROTOCOL.md` bytes — the fix is exactly this normalization, and a line-ending-invariance test now guards it.)*
 - **L5 — Capture the tool surface as the canonicalized array `{name, description, inputSchema, outputSchema}` plus the effective JSON Schema dialect.** Neither MCP nor the provider APIs ship a per-tool version or hash, so the lock's content hash is the missing drift detector, and the dialect is part of the contract. (findings 7, 33, 34, 35, 37)
 - **L6 — Pin the RESOLVED model id, never an alias.** A named model can be re-tuned server-side; the concrete platform identity is what makes a step replayable. (findings 19, 29)
 - **L7 — `output_sha256` records outputs for DRIFT DETECTION, not determinism.** Pinning model + prompt + temperature does not yield bit-identical outputs (batch-invariance, FP non-associativity, MoE routing, provider drift), so the honest claim is **"replayable inputs + drift-detectable outputs,"** never "deterministic replay." (findings 8, 19, 26, 27, 28, 30, 31, 32)
