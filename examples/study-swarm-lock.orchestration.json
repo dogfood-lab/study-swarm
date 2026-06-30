@@ -1,0 +1,369 @@
+{
+  "schema": "study-swarm.orchestration/v1",
+  "note": "Harness-emitted record of the Step-2 research agents for study-swarm-lock.dispatch.md. tool_schema pins the StructuredOutput contract each agent was bound to (the load-bearing, capturable surface); a full harness would pin the entire tool array. output_sha256 hashes the returned findings for drift detection (not determinism).",
+  "steps": [
+    {
+      "question_id": "Q1-replay-manifest",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "You are a research agent in a STUDY-SWARM (the research-grounded-advisor protocol) grounding the design of a new feature for the open-source repo `dogfood-lab/study-swarm`.\n\nTHE FEATURE — `dispatch.lock.json`: a per-dispatch lockfile that makes a study-swarm research dispatch BYTE-REPLAYABLE by pinning, per step:\n- the RESOLVED model id each research agent actually ran on (e.g. claude-opus-4-8, never an alias like \"opus\"),\n- the SHA-256 of the byte-exact agent prompt,\n- the SHA-256 of the tool JSONSchemas the agent had,\n- the external-verifier run/receipt id (e.g. a prism Ed25519 receipt id) and the receipt chain hash,\n- plus a top-level `lock_sha256` rollup over the whole lock (its content-address).\nThis implements the PIN_PER_STEP workflow standard (heritage: Snakemake 2012, Pegasus 2001).\n\nIMPLEMENTATION CONSTRAINTS (these shape which evidence is useful):\n- The CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC: SHA-256 via node:crypto, JSON I/O only. It makes NO model calls. The ORCHESTRATION HARNESS supplies the resolved models + byte-exact prompts + verifier run_id; the CLI only canonicalizes + hashes + validates them, and `lock --verify` re-derives the deterministic hashes and FAILS (exit 1) on drift.\n- Honest ceiling: pinning model+prompt+temp does NOT give bit-identical LLM outputs. The lock pins INPUTS byte-exact + records OUTPUT hashes for DRIFT DETECTION — \"replayable inputs + drift-detectable outputs\", NOT \"deterministic replay\".\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question. HARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source actually says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI, an RFC number, or a direct URL to the spec/paper — not a blog summary); the resolvable URL; whether you retrieved it; and a one-sentence DESIGN IMPLICATION for `dispatch.lock.json`.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Set retrieved=false for anything you could not actually fetch — those will be dropped.\n\n========\nYOUR QUESTION (Q1-replay-manifest):\nQUESTION: How do reproducible-workflow and build/package systems structure a replay manifest, and how do they detect & surface DRIFT between the lock and a re-run?\nInvestigate (retrieve the actual papers/docs): Snakemake (Koster & Rahmann 2012, Bioinformatics DOI:10.1093/bioinformatics/bts480; and the 2021 F1000Research sustainable-data-analysis update); Pegasus (Deelman et al., Future Generation Computer Systems 2015 / the workflow provenance work); Nextflow (Di Tommaso et al. 2017, Nature Biotechnology DOI:10.1038/nbt.3820); ReproZip (Chirigati et al.); Nix / reproducible builds; and DEPENDENCY LOCKFILES (npm package-lock.json integrity, Cargo.lock, uv.lock, pip --require-hashes / PEP 665 / PEP 658). For each: WHAT is pinned (inputs, versions, content hashes), HOW it is hashed/content-addressed, and HOW drift is detected and surfaced (e.g. an integrity mismatch failing the install/CI). Map each to a concrete `dispatch.lock.json` field or to the `lock --verify` drift-detection behavior.\n\nReturn structured findings. Remember: retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source (do not overstate)."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Koster & Rahmann\" or \"Rundgren et al.\" or \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number, or a direct URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: implication for dispatch.lock.json."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage gaps, sources you could not fetch, dropped claims."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-k5rkOOyAHGBCVacEk8LPULp+s5YHVzaUyCHJY4tD5jE="
+    },
+    {
+      "question_id": "Q2-canonicalization",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "You are a research agent in a STUDY-SWARM (the research-grounded-advisor protocol) grounding the design of a new feature for the open-source repo `dogfood-lab/study-swarm`.\n\nTHE FEATURE — `dispatch.lock.json`: a per-dispatch lockfile that makes a study-swarm research dispatch BYTE-REPLAYABLE by pinning, per step:\n- the RESOLVED model id each research agent actually ran on (e.g. claude-opus-4-8, never an alias like \"opus\"),\n- the SHA-256 of the byte-exact agent prompt,\n- the SHA-256 of the tool JSONSchemas the agent had,\n- the external-verifier run/receipt id (e.g. a prism Ed25519 receipt id) and the receipt chain hash,\n- plus a top-level `lock_sha256` rollup over the whole lock (its content-address).\nThis implements the PIN_PER_STEP workflow standard (heritage: Snakemake 2012, Pegasus 2001).\n\nIMPLEMENTATION CONSTRAINTS (these shape which evidence is useful):\n- The CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC: SHA-256 via node:crypto, JSON I/O only. It makes NO model calls. The ORCHESTRATION HARNESS supplies the resolved models + byte-exact prompts + verifier run_id; the CLI only canonicalizes + hashes + validates them, and `lock --verify` re-derives the deterministic hashes and FAILS (exit 1) on drift.\n- Honest ceiling: pinning model+prompt+temp does NOT give bit-identical LLM outputs. The lock pins INPUTS byte-exact + records OUTPUT hashes for DRIFT DETECTION — \"replayable inputs + drift-detectable outputs\", NOT \"deterministic replay\".\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question. HARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source actually says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI, an RFC number, or a direct URL to the spec/paper — not a blog summary); the resolvable URL; whether you retrieved it; and a one-sentence DESIGN IMPLICATION for `dispatch.lock.json`.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Set retrieved=false for anything you could not actually fetch — those will be dropped.\n\n========\nYOUR QUESTION (Q2-canonicalization):\nQUESTION: What is the correct way to canonicalize structured (JSON) data so a hash is STABLE across platforms and re-serializations, and how should per-step hashes roll up to one dispatch hash?\nInvestigate (retrieve the actual specs): RFC 8785 JSON Canonicalization Scheme (Rundgren, Jordan & Erdtman 2020) — exactly what it normalizes (property ordering, number serialization per ECMAScript, Unicode/UTF-8, whitespace); JWS/JOSE canonical serialization (RFC 7515); Merkle trees / hash chains (Merkle, CRYPTO 1987, DOI:10.1007/3-540-48184-2_32) for per-step → rollup; and the concrete instability sources a WINDOWS-authored tool must defend against — CRLF vs LF, key/property ordering, Unicode normalization (NFC/NFD), floating-point/number formatting, trailing whitespace, BOM. Map each to how `lock_sha256`, `prompt_sha256`, and `tool_schema_sha256` must be computed so the SAME dispatch hashes IDENTICALLY on Windows, Linux, and macOS.\n\nReturn structured findings. Remember: retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source (do not overstate)."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Koster & Rahmann\" or \"Rundgren et al.\" or \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number, or a direct URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: implication for dispatch.lock.json."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage gaps, sources you could not fetch, dropped claims."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-ymPE5lJqoygN0MpzqftgE1tYlyp7z+poCK2Z1Zj3mi8="
+    },
+    {
+      "question_id": "Q3-provenance-attestation",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "You are a research agent in a STUDY-SWARM (the research-grounded-advisor protocol) grounding the design of a new feature for the open-source repo `dogfood-lab/study-swarm`.\n\nTHE FEATURE — `dispatch.lock.json`: a per-dispatch lockfile that makes a study-swarm research dispatch BYTE-REPLAYABLE by pinning, per step:\n- the RESOLVED model id each research agent actually ran on (e.g. claude-opus-4-8, never an alias like \"opus\"),\n- the SHA-256 of the byte-exact agent prompt,\n- the SHA-256 of the tool JSONSchemas the agent had,\n- the external-verifier run/receipt id (e.g. a prism Ed25519 receipt id) and the receipt chain hash,\n- plus a top-level `lock_sha256` rollup over the whole lock (its content-address).\nThis implements the PIN_PER_STEP workflow standard (heritage: Snakemake 2012, Pegasus 2001).\n\nIMPLEMENTATION CONSTRAINTS (these shape which evidence is useful):\n- The CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC: SHA-256 via node:crypto, JSON I/O only. It makes NO model calls. The ORCHESTRATION HARNESS supplies the resolved models + byte-exact prompts + verifier run_id; the CLI only canonicalizes + hashes + validates them, and `lock --verify` re-derives the deterministic hashes and FAILS (exit 1) on drift.\n- Honest ceiling: pinning model+prompt+temp does NOT give bit-identical LLM outputs. The lock pins INPUTS byte-exact + records OUTPUT hashes for DRIFT DETECTION — \"replayable inputs + drift-detectable outputs\", NOT \"deterministic replay\".\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question. HARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source actually says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI, an RFC number, or a direct URL to the spec/paper — not a blog summary); the resolvable URL; whether you retrieved it; and a one-sentence DESIGN IMPLICATION for `dispatch.lock.json`.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Set retrieved=false for anything you could not actually fetch — those will be dropped.\n\n========\nYOUR QUESTION (Q3-provenance-attestation):\nQUESTION: How do software supply-chain frameworks capture STEP-LEVEL provenance, and which parts map to pinning \"model + prompt + tool-schema + verifier receipt\" for one dispatch step?\nInvestigate (retrieve the actual papers/specs): in-toto (Torres-Arias, Afzali, Kuppusamy, Curtmola & Cappos 2019, USENIX Security — the link metadata + layout model); SLSA (the OpenSSF SLSA provenance levels + the provenance predicate schema); Sigstore (Newman, Meyers et al. 2022, ACM CCS DOI:10.1145/3548606.3560596 — keyless signing + Rekor transparency log) and the verifiability-vs-anti-forgery distinction; SCITT and/or C2PA if relevant; and W3C PROV / research-object reproducibility lineage. For each: what a step attestation records (materials/inputs, the step command/predicate, products/outputs, the actor/environment), how steps are chained, and what \"verifiable but not unforgeable\" means for an ephemeral local signing key. Map each to the per-step record SHAPE of `dispatch.lock.json` and to the \"harness EMITS the record, CLI CANONICALIZES+HASHES+VALIDATES it\" separation.\n\nReturn structured findings. Remember: retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source (do not overstate)."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Koster & Rahmann\" or \"Rundgren et al.\" or \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number, or a direct URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: implication for dispatch.lock.json."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage gaps, sources you could not fetch, dropped claims."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-OSUAIhytytKihfFM1Y+p1BllUSTC+KEfb/NX86X+Kc0="
+    },
+    {
+      "question_id": "Q4-llm-determinism",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "You are a research agent in a STUDY-SWARM (the research-grounded-advisor protocol) grounding the design of a new feature for the open-source repo `dogfood-lab/study-swarm`.\n\nTHE FEATURE — `dispatch.lock.json`: a per-dispatch lockfile that makes a study-swarm research dispatch BYTE-REPLAYABLE by pinning, per step:\n- the RESOLVED model id each research agent actually ran on (e.g. claude-opus-4-8, never an alias like \"opus\"),\n- the SHA-256 of the byte-exact agent prompt,\n- the SHA-256 of the tool JSONSchemas the agent had,\n- the external-verifier run/receipt id (e.g. a prism Ed25519 receipt id) and the receipt chain hash,\n- plus a top-level `lock_sha256` rollup over the whole lock (its content-address).\nThis implements the PIN_PER_STEP workflow standard (heritage: Snakemake 2012, Pegasus 2001).\n\nIMPLEMENTATION CONSTRAINTS (these shape which evidence is useful):\n- The CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC: SHA-256 via node:crypto, JSON I/O only. It makes NO model calls. The ORCHESTRATION HARNESS supplies the resolved models + byte-exact prompts + verifier run_id; the CLI only canonicalizes + hashes + validates them, and `lock --verify` re-derives the deterministic hashes and FAILS (exit 1) on drift.\n- Honest ceiling: pinning model+prompt+temp does NOT give bit-identical LLM outputs. The lock pins INPUTS byte-exact + records OUTPUT hashes for DRIFT DETECTION — \"replayable inputs + drift-detectable outputs\", NOT \"deterministic replay\".\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question. HARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source actually says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI, an RFC number, or a direct URL to the spec/paper — not a blog summary); the resolvable URL; whether you retrieved it; and a one-sentence DESIGN IMPLICATION for `dispatch.lock.json`.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Set retrieved=false for anything you could not actually fetch — those will be dropped.\n\n========\nYOUR QUESTION (Q4-llm-determinism):\nQUESTION: Can pinning model + prompt + temperature (+ seed) yield reproducible LLM OUTPUTS, or only reproducible INPUTS? Find the strongest EMPIRICAL evidence.\nInvestigate (retrieve the actual sources): nondeterminism even at temperature 0 / fixed seed from floating-point non-associativity + GPU kernel/reduction order + BATCH-SIZE / batching effects (Thinking Machines Lab — He et al. 2025, \"Defeating Nondeterminism in LLM Inference\", thinkingmachines.ai; and the batch-invariant-kernels / vLLM work); provider-side SILENT MODEL DRIFT over time (Chen, Zaharia & Zou 2023, \"How Is ChatGPT's Behavior Changing over Time?\", arXiv:2307.09009); MoE/expert-routing nondeterminism; and any work quantifying output variance under fixed decoding params (e.g. reproducibility-of-LLM-evaluations papers, Atil et al. or similar). This finding JUSTIFIES the honest-ceiling claim: pin INPUTS byte-exact + record OUTPUT hashes for DRIFT DETECTION; do NOT claim \"deterministic replay\". Give the strongest citations for exactly that framing.\n\nReturn structured findings. Remember: retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source (do not overstate)."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Koster & Rahmann\" or \"Rundgren et al.\" or \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number, or a direct URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: implication for dispatch.lock.json."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage gaps, sources you could not fetch, dropped claims."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-aFDm9p4/94p97NJg/vWKbYXchv6N1b0swpIfYoep1iw="
+    },
+    {
+      "question_id": "Q5-tool-schema-drift",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "You are a research agent in a STUDY-SWARM (the research-grounded-advisor protocol) grounding the design of a new feature for the open-source repo `dogfood-lab/study-swarm`.\n\nTHE FEATURE — `dispatch.lock.json`: a per-dispatch lockfile that makes a study-swarm research dispatch BYTE-REPLAYABLE by pinning, per step:\n- the RESOLVED model id each research agent actually ran on (e.g. claude-opus-4-8, never an alias like \"opus\"),\n- the SHA-256 of the byte-exact agent prompt,\n- the SHA-256 of the tool JSONSchemas the agent had,\n- the external-verifier run/receipt id (e.g. a prism Ed25519 receipt id) and the receipt chain hash,\n- plus a top-level `lock_sha256` rollup over the whole lock (its content-address).\nThis implements the PIN_PER_STEP workflow standard (heritage: Snakemake 2012, Pegasus 2001).\n\nIMPLEMENTATION CONSTRAINTS (these shape which evidence is useful):\n- The CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC: SHA-256 via node:crypto, JSON I/O only. It makes NO model calls. The ORCHESTRATION HARNESS supplies the resolved models + byte-exact prompts + verifier run_id; the CLI only canonicalizes + hashes + validates them, and `lock --verify` re-derives the deterministic hashes and FAILS (exit 1) on drift.\n- Honest ceiling: pinning model+prompt+temp does NOT give bit-identical LLM outputs. The lock pins INPUTS byte-exact + records OUTPUT hashes for DRIFT DETECTION — \"replayable inputs + drift-detectable outputs\", NOT \"deterministic replay\".\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question. HARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source actually says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI, an RFC number, or a direct URL to the spec/paper — not a blog summary); the resolvable URL; whether you retrieved it; and a one-sentence DESIGN IMPLICATION for `dispatch.lock.json`.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Set retrieved=false for anything you could not actually fetch — those will be dropped.\n\n========\nYOUR QUESTION (Q5-tool-schema-drift):\nQUESTION: How do LLM agent frameworks and tool/function-calling systems pin or version the TOOL/FUNCTION schemas an agent had, so a replay with the same prompt but a CHANGED tool surface is DETECTED? (This is the half PIN explicitly flags as missing.)\nInvestigate (retrieve the actual docs/specs/papers): OpenAI & Anthropic function-calling / tool-use schema definitions (JSON Schema for tool parameters); the Model Context Protocol (MCP) tool definition format and any capability negotiation / version field (modelcontextprotocol.io spec); JSON Schema canonicalization/hashing for API-contract drift; OpenAPI + Pact consumer-driven contract testing and \"schema drift\" detection in API tooling; and any agent-reproducibility / agent-eval work that captures the TOOL ENVIRONMENT as part of a run record. For each: how the tool surface is represented and how a change is surfaced as a failure. Map each to the `tool_schema_sha256` field — exactly WHAT to hash (the canonicalized tool JSONSchemas the agent was given) and HOW a changed tool surface surfaces as a `lock --verify` drift failure.\n\nReturn structured findings. Remember: retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source (do not overstate)."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Koster & Rahmann\" or \"Rundgren et al.\" or \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number, or a direct URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: implication for dispatch.lock.json."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage gaps, sources you could not fetch, dropped claims."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-Y1lsUdKoplgdos0r4faN6UgxXX74D/Se0AVHCiUA9dM="
+    }
+  ],
+  "verification": {
+    "runner": "roleos verify-citations",
+    "runner_source": "role-os local clone E:/AI/role-os",
+    "tool": "prism verify --type citations",
+    "tool_version": "prism 1.6.0",
+    "verifier_model": "mistral-small:24b",
+    "verifier_family": "local",
+    "caller_family_excluded": "anthropic",
+    "verdict": "escalate",
+    "receipt_id": "prism-01kwbajx31dj9gcf5xn3cn5ydg",
+    "receipt_signature": "272c892124e3bc13a76b2674fa361b1d65aee6a588c74604cf4ae4e7c9440a8ba7888175b9ec1286fe87490121f694f64cd30adc3ffc0e1b31cd3365b7b38901",
+    "receipt_chain_sha256": "499b63905064a5e25fd1801c5530504c94742f2183c4d3c8eb545a20cfbb112e"
+  }
+}

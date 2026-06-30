@@ -178,6 +178,103 @@ try {
     if (!obj.findings.length) throw new Error('no findings parsed');
     for (const f of obj.findings) if (!f.identifier) throw new Error(`finding ${f.finding} has no resolvable identifier`);
   });
+
+  // --- lock: dispatch.lock.json (the PIN_PER_STEP feature) ---
+  const lockDir = join(work, 'lockdir'); mkdirSync(lockDir, { recursive: true });
+  const dPath = join(lockDir, 'demo.dispatch.md');
+  const orchPath = join(lockDir, 'demo.orchestration.json');
+  const lockJsonPath = join(lockDir, 'demo.lock.json');
+  const DISPATCH_TEXT = '# demo dispatch\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n';
+  const baseOrch = () => ({
+    steps: [
+      { question_id: 'Q1', resolved_model: 'claude-opus-4-8', prompt: 'PROMPT ONE bytes', tool_schema: { type: 'object', properties: { a: { type: 'string' } } }, schema_dialect: 'https://json-schema.org/draft/2020-12/schema', output: 'OUTPUT ONE' },
+      { question_id: 'Q2', resolved_model: 'claude-opus-4-8', prompt: 'PROMPT TWO bytes', tool_schema: { type: 'object' } },
+    ],
+    verification: { runner: 'roleos verify-citations', receipt_id: 'prism-test', receipt_chain_sha256: 'deadbeef' },
+  });
+  const writeFixtures = (orch) => { writeFileSync(dPath, DISPATCH_TEXT); writeFileSync(orchPath, JSON.stringify(orch)); };
+  const buildClean = () => { writeFixtures(baseOrch()); return run(['lock', dPath, '--from', orchPath]); };
+
+  check('lock requires --from to build (exit 2)', () => {
+    writeFixtures(baseOrch());
+    eq(run(['lock', dPath]).code, 2, 'exit');
+  });
+  check('lock builds a lock.json (exit 0) pinning model + prompt + tool-schema + output hashes', () => {
+    const r = run(['lock', dPath, '--from', orchPath]);
+    eq(r.code, 0, 'exit');
+    if (!existsSync(lockJsonPath)) throw new Error('lock.json not created');
+    const lock = JSON.parse(readFileSync(lockJsonPath, 'utf8'));
+    if (!/^sha256-/.test(lock.lock_sha256)) throw new Error('no lock_sha256');
+    if (lock.steps.length !== 2) throw new Error('wrong step count');
+    const s = lock.steps[0];
+    for (const k of ['prompt_sha256', 'tool_schema_sha256', 'output_sha256']) {
+      if (!/^sha256-/.test(s[k])) throw new Error(`step missing ${k}`);
+    }
+    if (s.resolved_model !== 'claude-opus-4-8') throw new Error('resolved_model not pinned');
+  });
+  check('lock build is deterministic (same inputs -> same lock_sha256)', () => {
+    const first = JSON.parse(readFileSync(lockJsonPath, 'utf8')).lock_sha256;
+    buildClean();
+    const second = JSON.parse(readFileSync(lockJsonPath, 'utf8')).lock_sha256;
+    if (first !== second) throw new Error(`nondeterministic: ${first} != ${second}`);
+  });
+  check('lock --verify passes a clean lock with --from (exit 0)', () => {
+    buildClean();
+    eq(run(['lock', '--verify', dPath, '--from', orchPath]).code, 0, 'exit');
+  });
+  check('lock --verify self-integrity passes without --from (exit 0)', () => {
+    eq(run(['lock', '--verify', dPath]).code, 0, 'exit');
+  });
+  // THE drift meta-test — a lock that can't go RED is theater. Each class must fail closed.
+  check('lock --verify goes RED when a pinned PROMPT drifts (exit 1)', () => {
+    buildClean();
+    const o = baseOrch(); o.steps[0].prompt = 'PROMPT ONE bytes!'; // one byte changed
+    writeFileSync(orchPath, JSON.stringify(o));
+    const r = run(['lock', '--verify', dPath, '--from', orchPath]);
+    eq(r.code, 1, 'exit');
+    if (!/drift/i.test(r.stderr)) throw new Error('no drift message');
+    if (!/prompt_sha256/.test(r.stderr)) throw new Error('did not name prompt_sha256 drift');
+  });
+  check('lock --verify goes RED when the OUTPUT drifts (exit 1)', () => {
+    buildClean();
+    const o = baseOrch(); o.steps[0].output = 'OUTPUT ONE changed';
+    writeFileSync(orchPath, JSON.stringify(o));
+    const r = run(['lock', '--verify', dPath, '--from', orchPath]);
+    eq(r.code, 1, 'exit');
+    if (!/output_sha256/.test(r.stderr)) throw new Error('did not name output_sha256 drift');
+  });
+  check('lock --verify goes RED when the resolved MODEL drifts (alias swap, exit 1)', () => {
+    buildClean();
+    const o = baseOrch(); o.steps[0].resolved_model = 'opus'; // alias instead of resolved id
+    writeFileSync(orchPath, JSON.stringify(o));
+    eq(run(['lock', '--verify', dPath, '--from', orchPath]).code, 1, 'exit');
+  });
+  check('lock --verify goes RED when the DISPATCH text drifts (exit 1)', () => {
+    buildClean();
+    writeFileSync(dPath, DISPATCH_TEXT.replace('demo dispatch', 'demo dispatch EDITED'));
+    const r = run(['lock', '--verify', dPath, '--from', orchPath]);
+    eq(r.code, 1, 'exit');
+    if (!/dispatch_sha256/.test(r.stderr)) throw new Error('did not name dispatch_sha256 drift');
+  });
+  check('lock --verify goes RED when the LOCK FILE is tampered (self-integrity, exit 1)', () => {
+    buildClean();
+    const lock = JSON.parse(readFileSync(lockJsonPath, 'utf8'));
+    lock.steps[0].prompt_sha256 = 'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='; // forge a hash, leave lock_sha256
+    writeFileSync(lockJsonPath, JSON.stringify(lock, null, 2));
+    const r = run(['lock', '--verify', dPath]); // no --from -> pure self-integrity
+    eq(r.code, 1, 'exit');
+    if (!/lock_sha256 mismatch/.test(r.stderr)) throw new Error('did not catch the lock-file tamper');
+  });
+  check('lock --verify with no lock present exits 2 (usage)', () => {
+    const empty = join(work, 'nolockdir'); mkdirSync(empty, { recursive: true });
+    const d2 = join(empty, 'x.dispatch.md'); writeFileSync(d2, DISPATCH_TEXT);
+    eq(run(['lock', '--verify', d2]).code, 2, 'exit');
+  });
+  check('the shipped example lock verifies clean against its orchestration (exit 0)', () => {
+    const exD = resolve(__dirname, '../examples/study-swarm-lock.dispatch.md');
+    const exO = resolve(__dirname, '../examples/study-swarm-lock.orchestration.json');
+    eq(run(['lock', '--verify', exD, '--from', exO]).code, 0, 'exit');
+  });
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

@@ -1,0 +1,62 @@
+{
+  "schema": "dispatch.lock/v1",
+  "study_swarm_version": "1.2.0",
+  "protocol_sha256": "sha256-xQn5Dcq9JUvE3j+b51A6e9Zfq27MbruIMA2VJ7HkxlY=",
+  "dispatch_sha256": "sha256-hyWW0IQK1e8Q1x1tshjBaT5+pFpZe/jkueyZCLdhvmU=",
+  "steps": [
+    {
+      "question_id": "Q1-replay-manifest",
+      "resolved_model": "claude-opus-4-8",
+      "prompt_sha256": "sha256-hcdcTxvqJNij0z9ItUPIzQhBWbrVZy3VvY4umPHaM5I=",
+      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-k5rkOOyAHGBCVacEk8LPULp+s5YHVzaUyCHJY4tD5jE="
+    },
+    {
+      "question_id": "Q2-canonicalization",
+      "resolved_model": "claude-opus-4-8",
+      "prompt_sha256": "sha256-Gj+ri3gWVWxP7M9fv50c0xsgiZ2j3T6kn3A3c3EhSos=",
+      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-ymPE5lJqoygN0MpzqftgE1tYlyp7z+poCK2Z1Zj3mi8="
+    },
+    {
+      "question_id": "Q3-provenance-attestation",
+      "resolved_model": "claude-opus-4-8",
+      "prompt_sha256": "sha256-g5/dW+zJvMObKyqnAdy70pUPtJcGD0DrsjkeEx/AcIY=",
+      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-OSUAIhytytKihfFM1Y+p1BllUSTC+KEfb/NX86X+Kc0="
+    },
+    {
+      "question_id": "Q4-llm-determinism",
+      "resolved_model": "claude-opus-4-8",
+      "prompt_sha256": "sha256-OfQ00IyAulvEOnZ/UpiLp+JTwF4jYUzQRaqCp3zgIbE=",
+      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-aFDm9p4/94p97NJg/vWKbYXchv6N1b0swpIfYoep1iw="
+    },
+    {
+      "question_id": "Q5-tool-schema-drift",
+      "resolved_model": "claude-opus-4-8",
+      "prompt_sha256": "sha256-qIr9Dl8GmGeikUrgCJ62QQh8FvTNUhvdxL0Ivk/Di3M=",
+      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "output_sha256": "sha256-Y1lsUdKoplgdos0r4faN6UgxXX74D/Se0AVHCiUA9dM="
+    }
+  ],
+  "verification": {
+    "runner": "roleos verify-citations",
+    "runner_source": "role-os local clone E:/AI/role-os",
+    "tool": "prism verify --type citations",
+    "tool_version": "prism 1.6.0",
+    "verifier_model": "mistral-small:24b",
+    "verifier_family": "local",
+    "caller_family_excluded": "anthropic",
+    "verdict": "escalate",
+    "receipt_id": "prism-01kwbajx31dj9gcf5xn3cn5ydg",
+    "receipt_signature": "272c892124e3bc13a76b2674fa361b1d65aee6a588c74604cf4ae4e7c9440a8ba7888175b9ec1286fe87490121f694f64cd30adc3ffc0e1b31cd3365b7b38901",
+    "receipt_chain_sha256": "499b63905064a5e25fd1801c5530504c94742f2183c4d3c8eb545a20cfbb112e"
+  },
+  "lock_sha256": "sha256-S8OA318DAqmrMoG0OpipuimY6ywFYpshEx9ffZ5HUjs="
+}

@@ -22,6 +22,13 @@ COMMANDS
   lint [--json] <path...>  Check dispatches' citations against the sourcing standard.
                            A <path> may be a file, a directory (linted recursively for
                            *.dispatch.md), or "-" to read one dispatch from stdin.
+  lock <dispatch> --from <orchestration.json>
+                           Emit <dispatch>.lock.json — pin (per Step-2 agent) the resolved
+                           model + SHA-256 of the byte-exact prompt + SHA-256 of the tool
+                           schema, plus the verifier receipt, rolled into one lock_sha256.
+  lock --verify <dispatch> [--from <orchestration.json>]
+                           Re-derive the deterministic hashes and assert they match the lock;
+                           drift exits 1 (gates CI). Without --from, checks lock self-integrity.
   help                     Show this help.
   version                  Print the version.
 
@@ -257,12 +264,181 @@ function cmdLint(args) {
   process.exit(anyFail ? 1 : 0);
 }
 
+// --- lock core (dispatch.lock.json — the PIN_PER_STEP feature) ------------------
+// Design + research grounding: examples/study-swarm-lock.dispatch.md (choices L1-L11).
+// The CLI is a PURE FUNCTION of provided bytes: the orchestration harness emits the record
+// (resolved models + byte-exact prompts + tool schemas + verifier receipt); the CLI only
+// canonicalizes + hashes + validates it. No network, no model calls (L2).
+
+const LOCK_SCHEMA = 'dispatch.lock/v1';
+
+// Self-describing digest "sha256-<base64>" — the W3C Subresource Integrity form: algorithm-
+// prefixed (so it's algorithm-agile) and used fail-closed on mismatch (L9; lock dispatch finding 38).
+function sriBytes(buf) { return 'sha256-' + createHash('sha256').update(buf).digest('base64'); }
+function sriString(str) { return sriBytes(Buffer.from(str, 'utf8')); }
+
+// RFC 8785 (JCS) canonical JSON, for the structured JSON the CLI assembles ITSELF (the tool
+// surface and the lock body): NFC-normalize strings, sort object keys by UTF-16 code unit (JS
+// default string sort), no inter-token whitespace, ECMAScript-shortest numbers, UTF-8 (L4).
+// The byte-exact PROMPT is deliberately NOT canonicalized — its raw bytes are what the model
+// conditioned on, so they are hashed directly (L3; JWS/DSSE hash-known-bytes rule, findings 12/23).
+function jcs(value) {
+  const ser = (v) => {
+    if (v === null) return 'null';
+    const t = typeof v;
+    if (t === 'boolean') return v ? 'true' : 'false';
+    if (t === 'number') {
+      if (!Number.isFinite(v)) throw new Error('JCS: non-finite number not allowed');
+      return JSON.stringify(v); // ECMAScript Number->String shortest round-trip
+    }
+    if (t === 'string') return JSON.stringify(v.normalize('NFC'));
+    if (Array.isArray(v)) return '[' + v.map(ser).join(',') + ']';
+    if (t === 'object') {
+      return '{' + Object.keys(v).sort()
+        .map((k) => JSON.stringify(k.normalize('NFC')) + ':' + ser(v[k])).join(',') + '}';
+    }
+    throw new Error(`JCS: unsupported type ${t}`);
+  };
+  return ser(value);
+}
+function jcsDigest(value) { return sriBytes(Buffer.from(jcs(value), 'utf8')); }
+
+// The lock sits beside its dispatch: <dir>/<stem>.lock.json (stem strips a trailing .dispatch.md).
+function lockPathFor(dispatch) {
+  const base = dispatch.split(/[\\/]/).pop().replace(/(\.dispatch)?\.md$/i, '');
+  return join(dirname(dispatch), `${base}.lock.json`);
+}
+
+// Build the lock object from the dispatch bytes + the harness-emitted orchestration record.
+function buildLockObject(dispatchPath, orchestration) {
+  const dispatchBytes = readFileSync(dispatchPath);
+  const protocolBytes = readFileSync(PROTOCOL_PATH);
+  if (!orchestration || !Array.isArray(orchestration.steps) || orchestration.steps.length === 0) {
+    fail(2, 'orchestration record has no non-empty "steps" array');
+  }
+  const steps = orchestration.steps.map((s, i) => {
+    const need = (k) => {
+      if (s == null || s[k] === undefined || s[k] === null) fail(2, `orchestration step ${i + 1} is missing "${k}"`);
+      return s[k];
+    };
+    const rec = {
+      question_id: String(need('question_id')),
+      resolved_model: String(need('resolved_model')),       // L6 — the resolved id, never an alias
+      prompt_sha256: sriString(String(need('prompt'))),     // L3 — raw bytes, not canonicalized
+      tool_schema_sha256: jcsDigest(need('tool_schema')),   // L5 — canonicalized tool surface
+    };
+    if (s.schema_dialect) rec.schema_dialect = String(s.schema_dialect); // L5 — dialect is contract
+    if (s.params && typeof s.params === 'object') rec.params = s.params;
+    // L7 — output hash for DRIFT DETECTION only (not determinism). The harness may ship the raw
+    // output (the CLI hashes it) OR a pre-computed output_sha256 (large outputs needn't be shipped).
+    if (typeof s.output_sha256 === 'string') rec.output_sha256 = s.output_sha256;
+    else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriString(s.output) : jcsDigest(s.output);
+    return rec;
+  });
+  const lock = {
+    schema: LOCK_SCHEMA,
+    study_swarm_version: VERSION,
+    protocol_sha256: sriBytes(protocolBytes),  // pins the methodology version
+    dispatch_sha256: sriBytes(dispatchBytes),  // pins the dispatch text
+    steps,
+  };
+  if (orchestration.verification && typeof orchestration.verification === 'object') {
+    lock.verification = orchestration.verification; // L10 — the external-verifier receipt
+  }
+  // L1/L9 — rollup over the whole body (this object, before lock_sha256 is added) as ONE flat
+  // canonical object: distinct keys give domain separation, the steps array's explicit length
+  // commits to exactly N steps (no odd-leaf duplication).
+  lock.lock_sha256 = jcsDigest(lock);
+  return lock;
+}
+
+// Verify a lock: self-integrity always; source-drift too when an orchestration record is supplied.
+// Strict-match, fail-closed (L8): returns a list of problems (empty = clean).
+function verifyLockObject(dispatchPath, lockPath, orchestration) {
+  let stored;
+  try { stored = JSON.parse(readFileSync(lockPath, 'utf8')); }
+  catch (err) { fail(2, `cannot read lock ${lockPath}: ${err && err.code ? err.code : err.message}`); }
+  const problems = [];
+  // 1) Self-integrity — recompute lock_sha256 over the stored body (detects a hand-edited lock).
+  if (!stored || typeof stored !== 'object' || typeof stored.lock_sha256 !== 'string') {
+    problems.push('lock has no lock_sha256 string');
+  } else {
+    const { lock_sha256, ...body } = stored;
+    const recomputed = jcsDigest(body);
+    if (lock_sha256 !== recomputed) {
+      problems.push(`lock_sha256 mismatch (the lock body was edited): stored ${lock_sha256} != recomputed ${recomputed}`);
+    }
+  }
+  // 2) Source drift — re-derive the deterministic hashes from the live inputs and strict-compare.
+  if (orchestration) {
+    const fresh = buildLockObject(dispatchPath, orchestration);
+    const cmp = (label, a, b) => { if (a !== b) problems.push(`${label} drift: lock ${b} != re-derived ${a}`); };
+    cmp('lock_sha256', fresh.lock_sha256, stored.lock_sha256); // the authoritative rollup guard
+    cmp('protocol_sha256', fresh.protocol_sha256, stored.protocol_sha256);
+    cmp('dispatch_sha256', fresh.dispatch_sha256, stored.dispatch_sha256);
+    const a = fresh.steps || [], b = Array.isArray(stored.steps) ? stored.steps : [];
+    if (a.length !== b.length) problems.push(`step count drift: re-derived ${a.length} != lock ${b.length}`);
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+      for (const k of ['question_id', 'resolved_model', 'prompt_sha256', 'tool_schema_sha256']) {
+        cmp(`steps[${i}].${k}`, a[i][k], b[i][k]);
+      }
+      if (a[i].output_sha256 || b[i].output_sha256) cmp(`steps[${i}].output_sha256`, a[i].output_sha256, b[i].output_sha256);
+    }
+  }
+  return problems;
+}
+
+function cmdLock(args) {
+  const verify = args.includes('--verify');
+  const rest = args.filter((a) => a !== '--verify');
+  let orchPath = null;
+  const fromIdx = rest.indexOf('--from');
+  if (fromIdx !== -1) {
+    orchPath = rest[fromIdx + 1];
+    if (!orchPath) fail(2, 'usage: --from <orchestration.json>');
+    rest.splice(fromIdx, 2);
+  }
+  const dispatch = rest[0];
+  if (!dispatch) {
+    fail(2, 'usage: study-swarm lock <dispatch> --from <orchestration.json>  |  study-swarm lock --verify <dispatch> [--from <orchestration.json>]');
+  }
+  if (!existsSync(dispatch)) fail(2, `dispatch not found: ${dispatch}`);
+  let orchestration = null;
+  if (orchPath) {
+    if (!existsSync(orchPath)) fail(2, `orchestration record not found: ${orchPath}`);
+    try { orchestration = JSON.parse(readFileSync(orchPath, 'utf8')); }
+    catch (err) { fail(2, `orchestration record is not valid JSON: ${err.message}`); }
+  }
+  const lockPath = lockPathFor(dispatch);
+
+  if (verify) {
+    if (!existsSync(lockPath)) fail(2, `no lock at ${lockPath} — create it with:  study-swarm lock ${dispatch} --from <orchestration.json>`);
+    const problems = verifyLockObject(dispatch, lockPath, orchestration);
+    if (problems.length === 0) {
+      const scope = orchestration ? 'lock integrity verified + no source drift' : 'lock self-integrity verified (pass --from to also check source drift)';
+      process.stdout.write(`ok ${lockPath}: ${scope}.\n`);
+      process.exit(0);
+    }
+    process.stderr.write(`x ${lockPath}: ${problems.length} drift/integrity issue(s)\n`);
+    for (const p of problems) process.stderr.write(`  - ${p}\n`);
+    process.exit(1);
+  }
+
+  if (!orchestration) {
+    fail(2, 'study-swarm lock <dispatch> requires --from <orchestration.json> — the harness-emitted record of resolved models + byte-exact prompts + tool schemas + the verifier receipt');
+  }
+  const lock = buildLockObject(dispatch, orchestration);
+  writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+  process.stdout.write(`Created ${lockPath}\nlock_sha256: ${lock.lock_sha256}\nVerify with:  study-swarm lock --verify ${dispatch} --from ${orchPath}\n`);
+}
+
 function main(argv) {
   const [cmd, ...rest] = argv;
   switch (cmd) {
     case 'protocol': return cmdProtocol();
     case 'new': return cmdNew(rest[0]);
     case 'lint': return cmdLint(rest);
+    case 'lock': return cmdLock(rest);
     case 'version': case '--version': case '-v':
       return void process.stdout.write(VERSION + '\n');
     case 'help': case '--help': case '-h': case undefined:

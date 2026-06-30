@@ -76,6 +76,8 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm protocol` | Print the full protocol — the five steps, the halt table, the sourcing standard. |
 | `study-swarm new <slug>` | Scaffold a `<slug>.dispatch.md` with the five-step skeleton to fill in. |
 | `study-swarm lint [--json] <path…>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
+| `study-swarm lock <dispatch> --from <orchestration.json>` | Pin a dispatch for replay — write `<dispatch>.lock.json` content-addressing, per Step-2 agent, the **resolved model id** + the **SHA-256 of the byte-exact prompt** + the **SHA-256 of the tool schema**, plus the Step-4 **verifier receipt**, rolled into one `lock_sha256`. |
+| `study-swarm lock --verify <dispatch> [--from …]` | Re-derive those hashes and assert they match the lock; any drift exits `1`, so it gates CI like a package lockfile. Without `--from`, checks the lock's own integrity. |
 
 `lint` is deterministic — zero model calls — so it's safe in CI. It enforces **Step 3's sourcing standard** locally; the model-based **Step 4** verification still defers to [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
@@ -88,7 +90,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-Two complete, lint-clean worked dispatches ship as references: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (the protocol's central decision, compact) and [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (the full v1.1 design pass — 27 citations, every one externally verified).
+Three complete, lint-clean worked dispatches ship as references: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (the protocol's central decision, compact), [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (the full v1.1 design pass — 27 citations, every one externally verified), and [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) (the v1.2 lock design — 39 citations, gated through the runner, and the first dispatch to ship its own lock).
 
 ### Gate it in CI
 
@@ -114,6 +116,12 @@ jobs:
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
 ```
 
+### Pin a dispatch for replay (`dispatch.lock.json`)
+
+A grounded, verified dispatch is only auditable if you can say *what produced it*. `study-swarm lock` writes a companion lockfile that content-addresses, per research agent, the **resolved model id** (never a floating alias), the **SHA-256 of the byte-exact prompt**, and the **SHA-256 of the tool schema** it was given, plus the external **verifier receipt** — rolled into one `lock_sha256`. `study-swarm lock --verify` re-derives those hashes and fails closed on any drift, so a changed prompt, a swapped model, or a shifted tool surface is caught — the [PIN_PER_STEP](https://github.com/dogfood-lab/study-swarm) reproducibility standard, made executable. The harness emits the record; the CLI stays zero-dependency and network-free, only canonicalizing (RFC 8785), hashing, and validating it.
+
+**It pins inputs, not outputs.** Pinning model + prompt + temperature does *not* make an LLM's output bit-identical — batch-invariance, floating-point non-associativity, mixture-of-experts routing, and silent provider drift are all outside an offline tool's control. So the lock gives you **replayable inputs and drift-detectable outputs**, never "deterministic replay." The design is grounded, citation by citation, in [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) — the first dispatch to ship its own lock ([`examples/study-swarm-lock.lock.json`](examples/study-swarm-lock.lock.json)).
+
 ## Why it works, in one breath
 
 **Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.
@@ -124,7 +132,7 @@ jobs:
 
 ## Status
 
-A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). **v1.1** sharpens the verifier where the first release was silent: decomposed/ternary groundedness, generation-time grounding, an oracle-gated cascade for combining lenses, and calibrated abstention — each grounded in the verified v1.1 dispatch. This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
+A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). **v1.1** sharpens the verifier where the first release was silent: decomposed/ternary groundedness, generation-time grounding, an oracle-gated cascade for combining lenses, and calibrated abstention — each grounded in the verified v1.1 dispatch. **v1.2** makes a dispatch byte-replayable: `study-swarm lock` pins the resolved model, prompt, and tool schema per step plus the verifier receipt, and `lock --verify` fails closed on drift. This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
 
 MIT licensed.
 

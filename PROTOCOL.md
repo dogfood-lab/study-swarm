@@ -141,3 +141,9 @@ Verifier admits before output
 - **Verifier as admission gate** — the verifier checks the output against the structure before admitting it; retries use a fresh context to avoid sycophancy drift.
 
 Designs that touch model-facing behavior default to this shape unless evidence justifies a different one.
+
+## Replayability — pinning a dispatch (`dispatch.lock.json`)
+
+A grounded, verified dispatch is only auditable if you can say *what produced it*. `study-swarm lock <dispatch> --from <orchestration.json>` writes a companion `dispatch.lock.json` that pins, per Step-2 research agent, the **resolved model id** (never an alias), the **SHA-256 of the byte-exact prompt**, and the **SHA-256 of the tool schema** the agent was given, plus the Step-4 **verifier receipt** — rolled into one `lock_sha256` content-address. `study-swarm lock --verify` re-derives those hashes and exits non-zero on any drift, so a changed prompt, model, or tool surface is caught — it gates CI exactly like a package lockfile. This is the PIN_PER_STEP standard made executable: the harness emits the record, and the CLI (zero-dependency, network-free) only canonicalizes, hashes, and validates it.
+
+**Honest ceiling:** pinning model + prompt + temperature does **not** make an LLM's *output* bit-identical — batch-invariance, floating-point non-associativity, mixture-of-experts routing, and silent provider drift all sit outside any offline tool's control. So the lock pins **inputs byte-exact and records output hashes for drift detection** — *replayable inputs + drift-detectable outputs*, never "deterministic replay." The design and its evidence are the worked dispatch [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) — itself the first dispatch to ship its own lock.

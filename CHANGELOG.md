@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-06-30
+
+Makes a study-swarm dispatch **byte-replayable**. The design was grounded by running study-swarm on this feature itself — five load-bearing questions (replay-manifest structure, cross-platform canonicalization, step-level provenance, LLM replay-determinism reality, tool-schema drift) dispatched to parallel retrieval-grounded agents; all 39 findings were gated through Step 4 (`roleos verify-citations` → prism, a different model family, reasoning-stripped) with a public-key-verified Ed25519 receipt before any informed the design.
+
+### Added
+
+- **`study-swarm lock <dispatch> --from <orchestration.json>`** — writes a companion `dispatch.lock.json` that content-addresses, per Step-2 research agent, the resolved model id, the SHA-256 of the byte-exact prompt, and the SHA-256 of the tool schema, plus the Step-4 verifier receipt, rolled into one `lock_sha256` (the PIN_PER_STEP standard). The harness emits the record; the CLI stays zero-dependency and network-free, only canonicalizing (RFC 8785 JCS + NFC normalization, no BOM), hashing (SHA-256, self-describing `sha256-…` digests), and validating.
+- **`study-swarm lock --verify <dispatch> [--from …]`** — re-derives every deterministic hash and fails closed (exit `1`) on any drift: a changed prompt, a swapped or aliased model, a shifted tool surface, edited dispatch text, or a tampered lock file. Gates CI like a package lockfile. Without `--from`, it checks the lock's own integrity.
+- A worked, runner-verified reference dispatch — `examples/study-swarm-lock.dispatch.md` (39 cited findings) — with its harness record (`examples/study-swarm-lock.orchestration.json`) and the first shipped lock (`examples/study-swarm-lock.lock.json`). All three ship in the npm tarball.
+- Smoke coverage proving `lock --verify` goes **RED** on every drift class (prompt, output, model, dispatch text, lock-file tamper) and that `lock` builds deterministically — a lock that can't detect drift is theater.
+
+### Changed
+
+- `PROTOCOL.md` adds a short **Replayability** section stating the PIN_PER_STEP property and its honest ceiling.
+
+### Honest ceiling
+
+Pinning model + prompt + temperature does **not** make an LLM's *output* bit-identical (batch-invariance, floating-point non-associativity, mixture-of-experts routing, silent provider drift). The lock pins **inputs byte-exact and records output hashes for drift detection** — replayable inputs + drift-detectable outputs, never "deterministic replay." Grounded in He & Thinking Machines Lab 2025, Yuan et al. 2025 (arXiv:2506.09501), Atil et al. 2024 (arXiv:2408.04667), and Chen, Zaharia & Zou 2023 (arXiv:2307.09009).
+
 ## [1.1.0] — 2026-06-29
 
 The protocol run on itself a second time — to design its own next version. Four load-bearing questions the first release left to "I think" were dispatched to parallel research agents; all 27 resulting citations were gated through Step 4 (retrieval oracle for existence + two different model families for groundedness, reasoning-stripped) before any informed the design. The oracle confirmed 27/27 exist — including six 2025–2026 papers a parametric model would have false-flagged — and corrected five attributions, among them a real first-author misattribution the research agent flagged on itself.
@@ -76,6 +95,7 @@ First stable release. A dogfood-swarm health + feature pass hardened the CLI and
 - `SECURITY.md`, MIT `LICENSE`, project logo.
 - Landing page + Starlight handbook at <https://dogfood-lab.github.io/study-swarm/>.
 
+[1.2.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.0.0
 [0.6.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v0.6.0

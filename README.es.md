@@ -76,6 +76,8 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm protocol` | Imprime el protocolo completo: los cinco pasos, la tabla de detención y el estándar de fuentes. |
 | `study-swarm new <slug>` | Crea un archivo `<slug>.dispatch.md` con el esqueleto de los cinco pasos para completarlo. |
 | `study-swarm lint [--json] <path…>` | Verifica la *fundamentación de la investigación* de una prueba en comparación con el estándar de fuentes: cada hallazgo necesita un autor, un año y un identificador resoluble (arXiv / DOI / URL); se rechaza cualquier afirmación vaga del tipo "los estudios demuestran...". Sale con código `1` si hay infracciones, por lo que valida la integración continua. Un `<path>` puede ser un archivo, un directorio (se analiza recursivamente para archivos `*.dispatch.md`) o `-` para la entrada estándar; `--json` emite un informe legible por máquina. |
+| `study-swarm lock <dispatch> --from <orchestration.json>` | Fija un envío para su reproducción: escribe el contenido con direccionamiento por contenido en `<dispatch>.lock.json`, según el agente del paso 2, que incluye el **ID de modelo resuelto** + el **SHA-256 del mensaje exacto en bytes** + el **SHA-256 del esquema de la herramienta**, más el **comprobante del verificador** del paso 4, todo integrado en un único `lock_sha256`. |
+| `study-swarm lock --verify <dispatch> [--from …]` | Vuelve a generar esos hashes y verifica que coincidan con el bloqueo; cualquier desviación provoca una salida con código `1`, por lo que actúa como un archivo de bloqueo de paquetes para la integración continua. Sin `--from`, comprueba la integridad del propio bloqueo. |
 
 `lint` es determinista: no realiza llamadas al modelo, por lo que es seguro en la integración continua. Aplica el **estándar de fuentes del paso 3** localmente; la verificación basada en modelos del **paso 4** sigue utilizando [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
@@ -88,7 +90,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-Dos pruebas completas y "limpias" se incluyen como referencias: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (la decisión central del protocolo, concisa) y [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (el diseño completo de la versión 1.1: 27 citas, todas verificadas externamente).
+Tres envíos completos y revisados se publican como referencias: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (la decisión central del protocolo, concisa), [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (el diseño completo de la versión 1.1: 27 citas, todas verificadas externamente) y [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) (el diseño del bloqueo de la versión 1.2: 39 citas, controlado a través del ejecutor, y el primer envío que incluye su propio bloqueo).
 
 ### Valídalo en la integración continua
 
@@ -114,6 +116,12 @@ jobs:
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
 ```
 
+### Fija un envío para su reproducción (`dispatch.lock.json`)
+
+Un envío verificado y con base sólida solo es auditable si se puede indicar *qué lo produjo*. `study-swarm lock` escribe un archivo de bloqueo complementario que, según el agente de investigación, utiliza el direccionamiento por contenido para incluir el **ID de modelo resuelto** (nunca un alias dinámico), el **SHA-256 del mensaje exacto en bytes** y el **SHA-256 del esquema de la herramienta** que se le proporcionó, más el **comprobante externo del verificador**, todo integrado en un único `lock_sha256`. `study-swarm lock --verify` vuelve a generar esos hashes y falla si detecta alguna desviación, por lo que cualquier cambio en el mensaje, un modelo diferente o una modificación en la herramienta se detectan. Este es el estándar de reproducibilidad [PIN_PER_STEP](https://github.com/dogfood-lab/study-swarm) implementado. El sistema emite el registro; la CLI permanece sin dependencias y sin conexión a la red, solo normaliza (RFC 8785), calcula hashes y lo valida.
+
+**Fija las entradas, no las salidas.** Fijar el modelo + el mensaje + la temperatura *no* hace que la salida de un LLM sea idéntica en bits; la invariancia por lotes, la no asociatividad de punto flotante, el enrutamiento de mezcla de expertos y la desviación silenciosa del proveedor están fuera del control de una herramienta offline. Por lo tanto, el bloqueo le proporciona **entradas reproducibles y salidas con detección de desviaciones**, nunca una "reproducción determinista". El diseño se basa, cita por cita, en [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md): el primer envío que incluye su propio bloqueo ([`examples/study-swarm-lock.lock.json`](examples/study-swarm-lock.lock.json)).
+
 ## Por qué funciona, en pocas palabras
 
 **Actual:** el campo evoluciona rápidamente; exigir estudios específicos con años evita que los diseños se retrasen 18 meses. **Funcional:** la evidencia muestra lo que *falla*, no solo lo que funciona (las explicaciones pueden aumentar la dependencia excesiva de la IA *incorrecta* — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Seguro:** el entorno protegido por el verificador es la arquitectura que respalda la evidencia, y el protocolo lo aplica a su propia salida. La verificación de fuentes no es un ejercicio académico; es el rastro de la evidencia.
@@ -124,7 +132,7 @@ jobs:
 
 ## Estado
 
-Un protocolo funcional, verificado externamente por su propio mecanismo: una familia de modelos diferente verifica sus citas (vea la prueba anterior). La **versión 1.1** mejora el verificador donde la primera versión no lo hacía: fundamentación descompuesta/ternaria, búsqueda en el momento de la generación, cascada validada por un oráculo para combinar perspectivas y abstención calibrada; todo ello se basa en la prueba verificada de la versión 1.1. Este repositorio es la referencia pública; [PROTOCOL.md](PROTOCOL.md) es la forma ejecutable. Forma parte de la familia [dogfood-lab](https://github.com/dogfood-lab): métodos y ejemplos para construir en la era de la IA.
+Un protocolo funcional, verificado externamente por su propia maquinaria: una familia de modelos diferente verifica sus citas (vea la prueba anterior). **v1.1** mejora el verificador donde la primera versión era silenciosa: solidez descompuesta/ternaria, fundamentación en el momento de la generación, una cascada controlada por un oráculo para combinar lentes y abstención calibrada; todo ello se basa en el envío v1.1 verificado. **v1.2** hace que un envío sea reproducible a nivel de bytes: `study-swarm lock` fija el modelo resuelto, el mensaje y el esquema de la herramienta por paso, además del comprobante del verificador, y `lock --verify` falla si detecta alguna desviación. Este repositorio es la referencia pública; [PROTOCOL.md](PROTOCOL.md) es la forma ejecutable. Forma parte de la familia [dogfood-lab](https://github.com/dogfood-lab): métodos y ejemplos para construir en la era de la IA.
 
 Con licencia MIT.
 

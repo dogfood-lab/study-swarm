@@ -46,6 +46,8 @@ npm i -g @dogfood-lab/study-swarm      # or: npx @dogfood-lab/study-swarm <comma
 | `study-swarm protocol` | Print the locked protocol (the source of this page). |
 | `study-swarm new <slug>` | Scaffold `<slug>.dispatch.md` — the five-step skeleton to fill in. |
 | `study-swarm lint [--json] <path…>` | Check a dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
+| `study-swarm lock <dispatch> --from <orchestration.json>` | Write `<dispatch>.lock.json` — pin (per Step-2 agent) the resolved model id + SHA-256 of the byte-exact prompt + SHA-256 of the tool schema, plus the Step-4 verifier receipt, in one `lock_sha256`. |
+| `study-swarm lock --verify <dispatch> [--from …]` | Re-derive the hashes and assert they match the lock; drift exits `1`. Without `--from`, checks the lock's own integrity. |
 
 A typical loop:
 
@@ -85,3 +87,16 @@ jobs:
 ```
 
 The handoff to Step 4 is the dispatch format itself: a finding written `N. **finding.** Authors year (arXiv|DOI). implication.` — one resolvable identifier per finding — is exactly what `roleos verify-citations` extracts and gates. A `lint`-clean dispatch hands off cleanly.
+
+## Pin a dispatch for replay
+
+A grounded, verified dispatch is only auditable if you can say *what produced it*. `study-swarm lock` writes a companion `dispatch.lock.json` that content-addresses, per Step-2 research agent, the **resolved model id** (never a floating alias), the **SHA-256 of the byte-exact prompt**, and the **SHA-256 of the tool schema** the agent was given, plus the Step-4 **verifier receipt** — rolled into one `lock_sha256`. This is the PIN_PER_STEP reproducibility standard made executable.
+
+```bash
+study-swarm lock my-decision.dispatch.md --from my-decision.orchestration.json   # writes my-decision.lock.json
+study-swarm lock --verify my-decision.dispatch.md --from my-decision.orchestration.json   # exit 1 on drift
+```
+
+The **harness emits** the orchestration record (the resolved models, the byte-exact prompts, the tool schemas, the verifier receipt); the CLI stays zero-dependency and network-free, only canonicalizing (RFC 8785 JCS, NFC-normalized, no BOM — so the same dispatch hashes identically on Windows, macOS, and Linux), hashing (SHA-256, self-describing `sha256-…` digests), and validating. `lock --verify` re-derives every hash and **fails closed** on a changed prompt, a swapped model, a shifted tool surface, edited dispatch text, or a tampered lock — so it gates CI exactly like a package lockfile.
+
+**It pins inputs, not outputs.** Pinning model + prompt + temperature does not make an LLM's output bit-identical — batch-invariance, floating-point non-associativity, mixture-of-experts routing, and silent provider drift are all outside an offline tool's control. So the lock gives you **replayable inputs and drift-detectable outputs**, never "deterministic replay." The full design, grounded citation by citation and gated through the verifier, is the worked dispatch [`examples/study-swarm-lock.dispatch.md`](https://github.com/dogfood-lab/study-swarm/blob/main/examples/study-swarm-lock.dispatch.md) — the first dispatch to ship its own lock.
