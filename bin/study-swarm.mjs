@@ -29,6 +29,20 @@ COMMANDS
   lock --verify <dispatch> [--from <orchestration.json>]
                            Re-derive the deterministic hashes and assert they match the lock;
                            drift exits 1 (gates CI). Without --from, checks lock self-integrity.
+  withdraw <identifier> --reason <reason> [--detail <text>] [--from <dir>] [--receipt <path>]
+                           Canon-rollback compensator. Flag every dispatch in the corpus whose
+                           Research grounding cites <identifier> as "evidence-withdrawn" (a
+                           tombstone sidecar <slug>.withdrawn.json — flag, never delete), and emit
+                           a content-addressed withdrawal receipt. --reason is one of:
+                           fabricated | misattributed | retracted | verifier-flipped | other.
+  requalify --check <corpus-dir>
+                           Fail closed (exit 1) for any dispatch carrying an unresolved
+                           evidence-withdrawn flag — the andon that HALTS a withdrawn finding's
+                           dependents until it is removed or re-grounded. Gates CI.
+  requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]
+                           Clear a flag once the finding is removed (the citation is gone) or
+                           re-grounded (re-verified clean by the sibling runner; --note records
+                           the attestation). Idempotent; appends to the sidecar's audit trail.
   help                     Show this help.
   version                  Print the version.
 
@@ -438,6 +452,259 @@ function cmdLock(args) {
   process.stdout.write(`Created ${lockPath}\nlock_sha256: ${lock.lock_sha256}\nVerify with:  study-swarm lock --verify ${dispatch} --from ${orchPath}\n`);
 }
 
+// --- canon-rollback core (the requalify_dependent_slices compensator) -----------
+// Design + research grounding: examples/study-swarm-canon-rollback.dispatch.md (choices C1-C12).
+// The compensator operates on the VOLATILE evidence layer (a per-dispatch tombstone sidecar),
+// never the STABLE protocol/lock shape — `lock --verify` is unaffected by withdraw/resolve (C11,
+// the Parnas boundary). Like `lock`, the CLI is a PURE FUNCTION of bytes: it flags, gates, and
+// receipts deterministically (file reads, JSON I/O, SHA-256); the actual re-verification of a
+// re-grounded finding defers to the sibling runner (C12, honest ceiling). No network, no models.
+
+const WITHDRAWN_SCHEMA = 'dispatch.withdrawn/v1';
+const RECEIPT_SCHEMA = 'withdrawal-receipt/v1';
+// A CLOSED, machine-readable reason enum — never free text (C3; OpenVEX/CSAF/CycloneDX: a status
+// must carry a structured justification, a bare flag is non-conformant).
+const WITHDRAW_REASONS = ['fabricated', 'misattributed', 'retracted', 'verifier-flipped', 'other'];
+
+// Normalize a citation identifier to ONE canonical key so the SAME source matches across the forms
+// a finding might cite it in: arXiv (bare / arxiv.org URL / version suffix), DOI (bare / doi.org
+// URL), RFC (RFC NNNN / rfc-editor / datatracker), else a trimmed lowercased URL. Used on BOTH the
+// dispatch's extracted identifier and the user's <identifier> argument so `withdraw arXiv:2402.15089`
+// flags a finding citing `https://arxiv.org/abs/2402.15089v2` (C2).
+function normIdent(raw) {
+  let s = String(raw || '').trim().toLowerCase().replace(/[).,;]+$/, '');
+  let m = s.match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/) || s.match(/arxiv:\s*(\d{4}\.\d{4,5})/);
+  if (m) return 'arxiv:' + m[1];
+  m = s.match(/(?:doi\.org\/|dx\.doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)/);
+  if (m) return 'doi:' + m[1].replace(/[).,;]+$/, '');
+  m = s.match(/rfc[\s/-]?(\d{3,5})/);
+  if (m) return 'rfc:' + m[1];
+  return s.replace(/\/+$/, '');
+}
+
+// The tombstone sits beside its dispatch: <dir>/<stem>.withdrawn.json (C4 — status travels WITH
+// the artifact, the OCSP-stapling property; stem strips a trailing .dispatch.md).
+function withdrawnPathFor(dispatch) {
+  const base = dispatch.split(/[\\/]/).pop().replace(/(\.dispatch)?\.md$/i, '');
+  return join(dirname(dispatch), `${base}.withdrawn.json`);
+}
+
+// Recursively collect files matching a regex (skips node_modules/.git), sorted for determinism.
+function walkByExt(dir, re) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkByExt(full, re));
+    else if (re.test(entry.name)) out.push(full);
+  }
+  return out.sort();
+}
+
+// The finding numbers in one dispatch whose citation normalizes to `want` (reuses the lint parser,
+// so Step 3 and the compensator agree on what a citation is).
+function findingsCiting(dispatchPath, want) {
+  const res = lintText(dispatchPath, readFileSync(dispatchPath, 'utf8'));
+  return (res.findings || []).filter((f) => f.identifier && normIdent(f.identifier) === want).map((f) => f.finding);
+}
+
+// Every dispatch in the corpus citing `target`, with the finding numbers + a content hash each.
+function findDependents(corpus, target) {
+  const want = normIdent(target);
+  const files = statSync(corpus).isDirectory() ? walkDispatches(corpus) : [corpus];
+  const deps = [];
+  for (const f of files) {
+    const hits = findingsCiting(f, want);
+    if (hits.length) deps.push({ path: f, dispatch_sha256: sriText(readFileSync(f, 'utf8')), findings: hits });
+  }
+  return deps;
+}
+
+// Content-address the sidecar/receipt exactly like the lock: jcsDigest over the body with the hash
+// field omitted (C8/C9 — TUF/Rekor/CT/Git content-addressing; self-integrity catches a hand-edit).
+function withSha(body, key) {
+  const { [key]: _omit, ...rest } = body;
+  return { ...rest, [key]: jcsDigest(rest) };
+}
+
+// Load an existing tombstone sidecar, or seed a fresh one for `dispatch`.
+function loadSidecar(dispatchPath) {
+  const p = withdrawnPathFor(dispatchPath);
+  if (existsSync(p)) {
+    try { return JSON.parse(readFileSync(p, 'utf8')); }
+    catch (err) { fail(2, `cannot read sidecar ${p}: ${err && err.code ? err.code : err.message}`); }
+  }
+  return {
+    schema: WITHDRAWN_SCHEMA,
+    study_swarm_version: VERSION,
+    dispatch: dispatchPath.split(/[\\/]/).pop(),
+    dispatch_sha256: sriText(readFileSync(dispatchPath, 'utf8')),
+    version: 0,
+    withdrawals: [],
+    audit_trail: [],
+  };
+}
+
+// Recompute the rolled-up hash and write the sidecar; returns the finalized object.
+function writeSidecar(dispatchPath, body) {
+  body.dispatch_sha256 = sriText(readFileSync(dispatchPath, 'utf8')); // reconcile to current content
+  const finalized = withSha(body, 'withdrawn_sha256');
+  writeFileSync(withdrawnPathFor(dispatchPath), JSON.stringify(finalized, null, 2) + '\n', 'utf8');
+  return finalized;
+}
+
+function parseFlags(args, withValue) {
+  const out = { _: [] };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith('--')) {
+      const k = a.slice(2);
+      if (withValue.has(k)) { out[k] = args[++i]; }
+      else out[k] = true;
+    } else out._.push(a);
+  }
+  return out;
+}
+
+function cmdWithdraw(args) {
+  const f = parseFlags(args, new Set(['reason', 'detail', 'from', 'receipt']));
+  const identifier = f._[0];
+  if (!identifier) fail(2, 'usage: study-swarm withdraw <identifier> --reason <reason> [--detail <text>] [--from <corpus-dir>] [--receipt <path>] [--json]');
+  if (!f.reason) fail(2, `withdraw requires --reason <${WITHDRAW_REASONS.join('|')}> — a withdrawal with no machine-readable cause is not allowed`);
+  if (!WITHDRAW_REASONS.includes(String(f.reason))) fail(2, `invalid --reason "${f.reason}" — use one of: ${WITHDRAW_REASONS.join(', ')}`);
+  const corpus = f.from || '.';
+  if (!existsSync(corpus)) fail(2, `corpus not found: ${corpus}`);
+  const want = normIdent(identifier);
+  const detail = f.detail ? String(f.detail) : '';
+
+  const deps = findDependents(corpus, identifier);
+  if (deps.length === 0) fail(2, `no dispatch in ${corpus} cites ${identifier} (normalized: ${want}) — nothing to withdraw`);
+
+  const dependents = [];
+  for (const d of deps) {
+    const body = loadSidecar(d.path);
+    const existing = body.withdrawals.find((w) => w.identifier === want);
+    // Idempotent: an identical withdrawal (same id + reason + detail, still withdrawn) is a no-op.
+    const identical = existing && existing.status === 'withdrawn' && existing.reason === String(f.reason) && (existing.detail || '') === detail;
+    if (!identical) {
+      if (existing) {
+        existing.reason = String(f.reason); existing.detail = detail; existing.status = 'withdrawn'; existing.resolution = null; existing.findings = d.findings;
+      } else {
+        body.withdrawals.push({ identifier: want, reason: String(f.reason), detail, findings: d.findings, status: 'withdrawn', resolution: null });
+      }
+      body.version += 1;
+      body.audit_trail.push({ seq: body.audit_trail.length + 1, event: 'withdraw', identifier: want, reason: String(f.reason), findings: d.findings });
+    }
+    const finalized = writeSidecar(d.path, body);
+    dependents.push({ dispatch: finalized.dispatch, dispatch_sha256: finalized.dispatch_sha256, findings: d.findings, sidecar: withdrawnPathFor(d.path).split(/[\\/]/).pop() });
+  }
+
+  const receipt = withSha({
+    schema: RECEIPT_SCHEMA,
+    study_swarm_version: VERSION,
+    identifier: want,
+    reason: String(f.reason),
+    detail,
+    corpus: corpus.split(/[\\/]/).pop() || corpus,
+    dependents,
+    post_rollback_state: `${dependents.length} dependent(s) flagged evidence-withdrawn; "study-swarm requalify --check" fails closed until each is removed or re-grounded.`,
+  }, 'receipt_sha256');
+
+  if (f.receipt) writeFileSync(String(f.receipt), JSON.stringify(receipt, null, 2) + '\n', 'utf8');
+
+  if (f.json) {
+    process.stdout.write(JSON.stringify(receipt) + '\n');
+    process.exit(0);
+  }
+  // Contrastive surfacing — never a silent drop (C10; Buçinca 2024, Bansal 2021).
+  process.stdout.write(`Withdrew ${want} (reason: ${f.reason}). ${dependents.length} dependent(s) flagged evidence-withdrawn:\n`);
+  for (const d of dependents) process.stdout.write(`  - ${d.dispatch} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
+  process.stdout.write(
+    `\nYou may have relied on this finding. Each flagged dispatch now HALTS "study-swarm requalify --check"\n` +
+    `until the finding is removed or re-grounded — re-ground or override.\n` +
+    `Receipt ${f.receipt ? String(f.receipt) : '(stdout: pass --json)'} — receipt_sha256 ${receipt.receipt_sha256}\n`);
+  process.exit(0);
+}
+
+function cmdRequalify(args) {
+  if (args.includes('--check')) return requalifyCheck(args.filter((a) => a !== '--check'));
+  if (args.includes('--resolve')) return requalifyResolve(args.filter((a) => a !== '--resolve'));
+  fail(2, 'usage: study-swarm requalify --check <corpus-dir>  |  study-swarm requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]');
+}
+
+function requalifyCheck(args) {
+  const f = parseFlags(args, new Set());
+  const corpus = f._[0];
+  if (!corpus) fail(2, 'usage: study-swarm requalify --check <corpus-dir> [--json]');
+  if (!existsSync(corpus)) fail(2, `corpus not found: ${corpus}`);
+  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i) : [corpus];
+  const halts = []; // { sidecar, dispatch, identifier, reason, findings }
+  const problems = [];
+  let resolvedCount = 0;
+  for (const sc of sidecars) {
+    let stored;
+    try { stored = JSON.parse(readFileSync(sc, 'utf8')); }
+    catch (err) { problems.push(`${sc}: not valid JSON (${err.message})`); continue; }
+    // Self-integrity: a hand-edited sidecar (e.g. a status forged to "resolved") fails closed.
+    if (typeof stored.withdrawn_sha256 !== 'string' || stored.withdrawn_sha256 !== withSha(stored, 'withdrawn_sha256').withdrawn_sha256) {
+      problems.push(`${sc}: withdrawn_sha256 self-integrity mismatch (the sidecar was hand-edited)`);
+    }
+    for (const w of stored.withdrawals || []) {
+      if (w.status === 'withdrawn') halts.push({ sidecar: sc.split(/[\\/]/).pop(), dispatch: stored.dispatch, identifier: w.identifier, reason: w.reason, findings: w.findings });
+      else if (w.status === 'resolved') resolvedCount += 1;
+    }
+  }
+  const red = halts.length > 0 || problems.length > 0;
+  if (f.json) {
+    process.stdout.write(JSON.stringify({ ok: !red, halts, resolved: resolvedCount, problems }) + '\n');
+    process.exit(red ? 1 : 0);
+  }
+  if (!red) {
+    process.stdout.write(`ok ${corpus}: no unresolved evidence-withdrawn flags (${resolvedCount} resolved).\n`);
+    process.exit(0);
+  }
+  process.stderr.write(`x requalify --check ${corpus}: ${halts.length} unresolved evidence-withdrawn flag(s) — HALT\n`);
+  for (const h of halts) process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it; re-ground or override.\n`);
+  for (const p of problems) process.stderr.write(`  - ${p}\n`);
+  process.exit(1);
+}
+
+function requalifyResolve(args) {
+  const f = parseFlags(args, new Set(['mode', 'note']));
+  const dispatch = f._[0];
+  const identifier = f._[1];
+  if (!dispatch || !identifier) fail(2, 'usage: study-swarm requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]');
+  if (!existsSync(dispatch)) fail(2, `dispatch not found: ${dispatch}`);
+  const scPath = withdrawnPathFor(dispatch);
+  if (!existsSync(scPath)) fail(2, `no tombstone sidecar at ${scPath} — nothing to resolve`);
+  const mode = f.mode ? String(f.mode) : null;
+  if (mode !== 'removed' && mode !== 'regrounded') fail(2, 'requalify --resolve requires --mode removed|regrounded');
+  const want = normIdent(identifier);
+  let body;
+  try { body = JSON.parse(readFileSync(scPath, 'utf8')); }
+  catch (err) { fail(2, `cannot read sidecar ${scPath}: ${err && err.code ? err.code : err.message}`); }
+  const entry = (body.withdrawals || []).find((w) => w.identifier === want);
+  if (!entry) fail(2, `no evidence-withdrawn flag for ${identifier} (normalized: ${want}) on ${dispatch}`);
+
+  if (entry.status === 'resolved') { // Idempotent: re-resolving is a no-op, no new audit entry (C7).
+    process.stdout.write(`ok ${scPath}: ${want} already resolved (mode: ${entry.resolution && entry.resolution.mode}) — no-op.\n`);
+    process.exit(0);
+  }
+  if (mode === 'removed') {
+    const still = findingsCiting(dispatch, want);
+    if (still.length) fail(1, `${dispatch} still cites ${want} (findings ${still.map((n) => '#' + n).join(', ')}) — cannot resolve --mode removed until the finding is removed; use --mode regrounded with --note <attestation> if it was re-verified in place`);
+  } else if (mode === 'regrounded' && !f.note) {
+    fail(2, '--mode regrounded requires --note <attestation> — the CLI records that the sibling runner re-verified the finding, it does not itself re-verify');
+  }
+  entry.status = 'resolved';
+  entry.resolution = { mode, note: f.note ? String(f.note) : '' };
+  body.version += 1;
+  body.audit_trail.push({ seq: (body.audit_trail || []).length + 1, event: 'resolve', identifier: want, mode, note: f.note ? String(f.note) : '' });
+  const finalized = writeSidecar(dispatch, body);
+  process.stdout.write(`Resolved ${want} on ${finalized.dispatch} (mode: ${mode}). Sidecar version ${finalized.version}; withdrawn_sha256 ${finalized.withdrawn_sha256}\n`);
+  process.exit(0);
+}
+
 function main(argv) {
   const [cmd, ...rest] = argv;
   switch (cmd) {
@@ -445,6 +712,8 @@ function main(argv) {
     case 'new': return cmdNew(rest[0]);
     case 'lint': return cmdLint(rest);
     case 'lock': return cmdLock(rest);
+    case 'withdraw': return cmdWithdraw(rest);
+    case 'requalify': return cmdRequalify(rest);
     case 'version': case '--version': case '-v':
       return void process.stdout.write(VERSION + '\n');
     case 'help': case '--help': case '-h': case undefined:

@@ -78,6 +78,9 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm lint [--json] <path…>` | 根据来源标准检查工作流程的*研究扎实性*——每条研究结果都需要作者、年份和一个可解析的标识符（arXiv / DOI / URL）；“研究表明……”这种含糊其辞的方式将被拒绝。如果存在违规行为，则退出代码为`1`，以便在CI中进行筛选。`<path>`可以是文件、目录（递归地检查所有`.dispatch.md`文件），或者`-`表示标准输入；`--json`会输出机器可读的报告。 |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | 将一个调度固定下来以便重放——编写 `<dispatch>.lock.json`，其中包含基于内容的哈希值，按照步骤 2 中的代理进行操作，包括**已解析的模型 ID** + **字节级精确提示的 SHA-256 值** + **工具模式的 SHA-256 值**，以及步骤 4 中的**验证者凭证**，并将它们组合成一个 `lock_sha256`。 |
 | `study-swarm lock --verify <dispatch> [--from …]` | 重新计算这些哈希值并确认它们与锁匹配；如果出现任何偏差，则退出并返回 1，因此它就像软件包的 lock 文件一样，可以控制 CI 流程。如果不使用 `--from` 参数，则会检查锁自身的完整性。 |
+| `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **规范回滚补偿器。** 标记语料库中每个引用 `<id>` 作为“证据已撤回”（一个墓碑侧文件 `<slug>.withdrawn.json`——标记，永不删除）的文档，并生成基于内容的撤回凭证。 `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`。 |
+| `study-swarm requalify --check <corpus-dir>` | 对于任何带有未解决的“证据已撤回”标志的文档，执行失败安全机制（退出代码为 `1`）——这是一种“andon”（警报），它会**阻止**已撤回结论的依赖项，直到该结论被删除或重新验证。用于门控 CI。 |
+| `study-swarm requalify --resolve <dispatch> <id> --mode removed\ | regrounded [--note …]` | 一旦该结论被删除（引用消失）或重新验证（由辅助运行器重新验证；`--note` 记录证明），则清除标志。幂等性；附加到侧文件的审计跟踪中。 |
 
 `lint`是确定性的——不调用任何模型——因此可以在CI中安全使用。它在本地强制执行**第3步的来源标准**；基于模型的**第4步**验证仍然依赖于[`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism。
 
@@ -90,7 +93,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-三个完整的、经过清理的调度文件作为参考发布：[`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md)（协议的核心决策，简洁），[`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md)（完整的 v1.1 设计版本——27 处引用，每一处都经过外部验证），以及 [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md)（v1.2 的锁设计——39 处引用，通过运行器进行控制，并且是第一个发布其自身锁的调度文件）。
+四个完整的、经过代码检查的文档作为参考发布：[`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md)（协议的核心决策，简洁），[`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md)（完整的 v1.1 设计版本——27 个引用，每个引用都经过外部验证），[`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md)（v1.2 锁定设计——39 个引用，通过运行器进行门控，并且是第一个发布其自身锁定的文档），以及 [`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md)（v1.3 规范回滚设计——27 个引用，涵盖撤销、撤稿、连续事件和构建失效，并且是第一个被撤回然后重新验证的文档）。
 
 ### 在CI中进行筛选
 
@@ -122,6 +125,20 @@ jobs:
 
 **它固定输入，而不是输出。** 固定模型 + 提示 + 温度并不能使 LLM 的输出完全相同——批处理不变性、浮点数非结合律、混合专家路由以及无声提供者漂移都超出了离线工具的控制范围。因此，该锁为您提供**可重放的输入和可检测偏差的输出**，而不是“确定性重放”。该设计基于 [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) 中的每一处引用，并且是第一个发布其自身锁（[`examples/study-swarm-lock.lock.json`](examples/study-swarm-lock.lock.json)）的调度文件。
 
+### 回滚已撤回的结论 (`withdraw` / `requalify`)
+
+经过验证的结论成为**规范**——它会影响下游决策。那么，如果稍后该结论被**撤回**（在重新运行时发现引用是捏造/错误归因，引用的论文被撤稿，或者门控机制将其标记），会发生什么？简单的 `git revert` 并不足以解决问题，因为该结论已经传播开来。规范回滚补偿器使清理过程可执行：
+
+```bash
+study-swarm withdraw arXiv:2402.15089 --reason misattributed --from dispatches/ --receipt rollback.json
+#   → flags every dispatch citing it `evidence-withdrawn` (a tombstone sidecar — flag, never delete)
+#     and writes a content-addressed withdrawal receipt naming every dependent.
+study-swarm requalify --check dispatches/          # exit 1 while any flag is unresolved — the andon HALT
+study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   # or: --mode regrounded --note "<attestation>"
+```
+
+`requalify --check` 在每个带有标志的结论被删除或**重新验证**（由辅助运行器重新验证——CLI 记录证明，它本身不会重新验证）之前，将**失败安全**。撤回以**对比方式**呈现，而不是默默地删除。所有内容——墓碑和凭证——都基于内容进行寻址且可检测漂移，并且仅对*证据*层进行操作：`lock --verify` 不受撤回的影响。该设计基于 [`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md)，并且 [PROTOCOL.md](PROTOCOL.md) §“补偿已撤回的结论”是可执行的形式。这是**NAMED_COMPENSATORS** 标准的可执行版本：一种命名的、幂等的撤销操作，它会留下一个已知的后期状态和一个凭证。
+
 ## 用一句话概括其工作原理
 
 **及时性**——该领域发展迅速；要求提供具体的带有年份的研究，可以防止设计落后18个月。**功能性**——证据表明哪些*方法失败*，而不仅仅是哪些有效（解释可能会增加对*错误*人工智能的过度依赖——Bansal等人，2021年，[arXiv:2006.14779](https://arxiv.org/abs/2006.14779)）。**安全性**——受验证器保护的范围是证据支持的架构，并且协议对其自身的输出进行强制执行。来源不是学术上的形式主义；它是证据链。
@@ -132,7 +149,7 @@ jobs:
 
 ## 状态
 
-一个可工作的协议，由其自身的机制进行外部验证——不同的模型系列会检查其引用（参见上面的证明）。**v1.1** 改进了验证器，而第一个版本是静默的：分解/三元接地、生成时接地、用于组合透镜的 oracle 门控级联以及校准后的弃权——所有这些都基于经过验证的 v1.1 调度。**v1.2** 使调度可以进行字节级别的重放：`study-swarm lock` 会按照步骤固定已解析的模型、提示和工具模式，并添加验证者凭证，而 `lock --verify` 则会在出现偏差时失败并停止。此仓库是公共参考；[PROTOCOL.md](PROTOCOL.md) 是可执行的形式。它是 [dogfood-lab](https://github.com/dogfood-lab) 系列的一部分——用于在人工智能时代构建的各种方法和示例。
+一个可工作的协议，由其自身的机制进行外部验证——不同的模型系列检查其引用（参见上面的证明）。**v1.1** 改进了验证器，而第一个版本是静默的：分解/三元验证、生成时验证、用于组合透镜的基于 oracle 的级联以及校准后的弃权——每个都基于经过验证的 v1.1 文档。**v1.2** 使文档可重放：`study-swarm lock` 为每个步骤固定已解决的模型、提示和工具模式，以及验证器凭证，并且 `lock --verify` 在检测到漂移时会失败安全。**v1.3** 使回滚操作可执行：当已经成为规范的结论被撤回时，`study-swarm withdraw` 会标记所有依赖项，并且 `requalify --check` 会阻止它们，直到它们被删除或重新验证——这是一种命名的、带有凭证的、幂等的补偿器。此仓库是公共参考；[PROTOCOL.md](PROTOCOL.md) 是可执行的形式。它是 [dogfood-lab](https://github.com/dogfood-lab) 系列的一部分——用于在人工智能时代构建的方法和示例。
 
 采用MIT许可证。
 

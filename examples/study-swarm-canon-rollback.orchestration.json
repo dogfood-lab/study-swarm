@@ -1,0 +1,761 @@
+{
+  "schema": "study-swarm.orchestration/v1",
+  "note": "Harness-emitted record of the Step-2 research agents for study-swarm-canon-rollback.dispatch.md (workflow wf_8103fd06-49b: 5 research lanes + a coverage-recovery existence audit each). tool_schema pins the StructuredOutput contract each agent was bound to; output_sha256 hashes the returned findings for drift detection (not determinism). The Step-4 verifier block pins the prism receipt from the live roleos verify-citations -> prism run.",
+  "steps": [
+    {
+      "question_id": "Q1-revocation-propagation",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "THE FEATURE you are grounding — the CANON-ROLLBACK COMPENSATOR for the open-source repo `dogfood-lab/study-swarm` (a research-grounded design protocol + a thin, zero-dependency CLI).\n\nHow the protocol works: it dispatches parallel research agents, demands cited findings, verifies every citation with a DIFFERENT model family, and then a synthesized \"dispatch\" document's findings BECOME CANON — they inform a downstream design decision. THE PROBLEM: when a cited finding is later WITHDRAWN — a citation turns out fabricated or misattributed on a re-run, a cited paper is RETRACTED upstream, or the verification gate flips it — a plain `git revert` is NOT sufficient, because the finding already propagated into the dependent design. So the protocol names a compensator, `requalify_dependent_slices`, which must:\n  (1) find every dispatch whose citations include the withdrawn identifier;\n  (2) FLAG each one `evidence-withdrawn` with a machine-readable mark (a tombstone sidecar JSON) — FLAG, never silently delete;\n  (3) emit a content-addressed WITHDRAWAL RECEIPT (withdrawn id + reason + the dependents flagged + a content hash + the post-rollback state);\n  (4) FAIL CLOSED (a gate that exits non-zero) for any dispatch carrying an unresolved withdrawn flag, until the finding is removed or RE-GROUNDED (re-verified clean by a sibling runner). A withdrawn finding HALTS its dependents (an andon).\n  (5) clear the flag idempotently once the finding is corrected + re-verified, appending to the receipt's audit trail.\n\nHARD CONSTRAINTS that shape which evidence is useful: the CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC (SHA-256 via node:crypto, JSON I/O only; NO model calls). The actual re-verification of a re-grounded finding defers to a SIBLING runner — this CLI only flags, gates, and receipts deterministically. The receipt/flag must be content-addressed (a self-describing sha256 digest), drift-detectable, and auditable, exactly like the existing dispatch.lock.json.\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question, so the design rests on how adjacent fields actually solved this — not on improvisation.\n\nHARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented. Set retrieved=false for anything you could not fetch — it will be dropped.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI 10.xxxx/..., an RFC number, or a direct URL to the spec — not a blog summary of it); the resolvable URL; retrieved (bool); and a one-sentence DESIGN IMPLICATION for the compensator.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Many of your best sources are RFCs / OASIS / NISO / vendor specs, NOT arXiv. That is expected and GOOD — pin the RFC number or the canonical spec URL.\n\n========\nYOUR QUESTION (Q1-revocation-propagation):\nHow do certificate, package, and supply-chain systems propagate a REVOCATION or WITHDRAWAL to downstream dependents, and what is the data model — revoke vs flag vs delete, soft vs hard, how do dependents learn?\nRetrieve the actual specs/docs: X.509 CRL (RFC 5280) and OCSP (RFC 6960) + OCSP stapling (RFC 6066); the Go module `retract` directive and the checksum database; Cargo `cargo yank`; npm `deprecate` vs `unpublish` (and npm's unpublish policy); PyPI \"yank\" (PEP 592); TUF (The Update Framework) key/target revocation and Sigstore/Rekor transparency. For EACH: is the artifact DELETED or FLAGGED-AND-RETAINED? how is the revocation signaled to consumers? is it SOFT (warn, still resolvable) or HARD (refuse)? Map each to either `evidence-withdrawn` as a flag-don't-delete tombstone, or to the fail-closed `requalify --check` gate, or to soft-vs-hard withdrawal semantics.\n\nReturn structured findings. Retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source — do NOT overstate."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Garcia-Molina & Salem\", \"OASIS CSAF TC\", \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "A RESOLVABLE id: arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number (RFC 5280), or a direct URL to the spec/paper."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: what this implies for the canon-rollback compensator (withdraw / requalify --check / --resolve / the receipt / the tombstone flag)."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage caveats, anything dropped for non-retrieval, disagreements between sources."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "params": {
+        "effort": "high"
+      },
+      "output": {
+        "question_id": "Q1-revocation-propagation",
+        "findings": [
+          {
+            "claim": "An X.509 CRL never deletes a revoked certificate — it keeps the serial number listed with a CRLReason code, and an entry MUST NOT be removed until after the cert's validity period expires, so revocation is a retained, machine-readable flag, not a deletion.",
+            "authors": "Cooper et al. / IETF PKIX (RFC 5280)",
+            "year": "2008",
+            "identifier": "RFC 5280",
+            "url": "https://datatracker.ietf.org/doc/html/rfc5280",
+            "retrieved": true,
+            "design_implication": "Models the evidence-withdrawn tombstone directly: the withdrawn finding stays in place, flagged with a reason code in a retained sidecar, and the flag persists across rebuilds rather than being garbage-collected — exactly flag-don't-delete."
+          },
+          {
+            "claim": "OCSP returns one of three statuses (good / revoked / unknown), and a 'revoked' response carries a RevokedInfo with revocationTime and an optional revocationReason, letting a consumer learn current status by querying rather than scanning a full list.",
+            "authors": "Santesson et al. / IETF (RFC 6960)",
+            "year": "2013",
+            "identifier": "RFC 6960",
+            "url": "https://datatracker.ietf.org/doc/html/rfc6960",
+            "retrieved": true,
+            "design_implication": "The requalify --check gate should return a small tri-state per dependent (clean / withdrawn / unknown) carrying the withdrawn id + reason + time, mirroring OCSP's compact status-plus-reason record rather than forcing callers to diff a whole CRL."
+          },
+          {
+            "claim": "OCSP stapling (TLS Certificate Status Request extension) has the SERVER attach a complete signed OCSP response inline via a CertificateStatus message during the handshake, so revocation status travels WITH the artifact instead of requiring the consumer to fetch it separately.",
+            "authors": "Eastlake / IETF (RFC 6066, Section 8)",
+            "year": "2011",
+            "identifier": "RFC 6066",
+            "url": "https://datatracker.ietf.org/doc/html/rfc6066",
+            "retrieved": true,
+            "design_implication": "The withdrawal receipt should be stapled alongside each flagged dispatch (a co-located tombstone sidecar) so a runner reading the dispatch gets the withdrawal status inline and deterministically, with no network call — fitting the zero-dependency, network-free constraint."
+          },
+          {
+            "claim": "Go's 'retract' directive keeps the version available on proxies (builds depending on it still work) but excludes it from automatic selection and warns on `go list -m -u` / `go get`; the spec explicitly borrows the academic 'retracted paper' analogy — still available, but not a basis for future work.",
+            "authors": "The Go Authors (Go Modules Reference)",
+            "year": "2019",
+            "identifier": "https://go.dev/ref/mod#go-mod-file-retract",
+            "url": "https://go.dev/ref/mod",
+            "retrieved": true,
+            "design_implication": "Validates the protocol's exact framing: a withdrawn finding is retained and replayable but must HALT automatic downstream use and surface a warning, and re-grounding (publishing a corrected finding) is the intended remedy — the same retract-then-supersede pattern."
+          },
+          {
+            "claim": "`cargo yank` removes a version from the registry index but does NOT delete data — existing projects with a Cargo.lock still resolve and download it, new projects without a prior lockfile cannot, and `--undo` re-adds it to the index.",
+            "authors": "The Cargo Authors (Rust)",
+            "year": "2024",
+            "identifier": "https://doc.rust-lang.org/cargo/commands/cargo-yank.html",
+            "url": "https://doc.rust-lang.org/cargo/commands/cargo-yank.html",
+            "retrieved": true,
+            "design_implication": "Supports an idempotent clear/undo: clearing the evidence-withdrawn flag after re-verification is the `--undo` analog (reversible, re-adds the finding to active use), and yanking-not-deleting confirms already-pinned dispatches stay reproducible while new dependents are blocked."
+          },
+          {
+            "claim": "npm treats registry data as immutable: after 72 hours a version can be unpublished only if it has no dependents, <300 weekly downloads, and a single owner; otherwise npm recommends `npm deprecate`, which keeps the package downloadable but attaches a warning message so consumer builds do not break.",
+            "authors": "npm, Inc. (Unpublish Policy)",
+            "year": "2024",
+            "identifier": "https://docs.npmjs.com/policies/unpublish/",
+            "url": "https://docs.npmjs.com/policies/unpublish/",
+            "retrieved": true,
+            "design_implication": "Strong precedent that the default for a withdrawn finding must be deprecate-style (flag + warning, retained) rather than unpublish-style (delete) precisely because it has dependents — hard deletion is reserved only for the no-dependents case, justifying flag-don't-delete as the compensator default."
+          },
+          {
+            "claim": "PEP 592 'yank' adds a data-yanked attribute (with an optional arbitrary reason string) to a PyPI file: installers always ignore yanked files EXCEPT when a yanked file is the only one matching an exact `==` pin, deliberately preserving pinned builds while discouraging new adoption.",
+            "authors": "Stufft / Python (PEP 592)",
+            "year": "2019",
+            "identifier": "PEP 592",
+            "url": "https://peps.python.org/pep-0592/",
+            "retrieved": true,
+            "design_implication": "Defines the soft-vs-hard boundary for the gate: a withdrawn finding is soft-ignored for new grounding but a dispatch that explicitly pins it must still resolve (the receipt carries the reason string), so requalify --check should distinguish pinned-retained dependents from auto-selecting ones."
+          },
+          {
+            "claim": "TUF makes every target removal and key revocation an explicit signed, version-incremented metadata change (consumers learn only via updated signed metadata), and the timestamp/snapshot roles enforce monotonic version ordering so a rolled-back or replayed older state is rejected (rollback-attack protection).",
+            "authors": "TUF community / CNCF (TUF Specification, latest)",
+            "year": "2024",
+            "identifier": "https://theupdateframework.github.io/specification/latest/",
+            "url": "https://theupdateframework.github.io/specification/latest/",
+            "retrieved": true,
+            "design_implication": "The withdrawal receipt should be a signed/hashed, version-incremented record (content hash + monotonic state) so a replay of a pre-withdrawal dispatch state fails the gate — the receipt itself is the rollback-detection mechanism, matching dispatch.lock.json's drift detection."
+          },
+          {
+            "claim": "Rekor (Sigstore's transparency log) is an append-only, tamper-resistant Merkle-tree ledger where entries are never mutated or removed; each entry yields a content-addressed inclusion proof and log index enabling independent auditability and non-repudiation of an artifact's lifecycle.",
+            "authors": "Sigstore / OpenSSF (Rekor docs)",
+            "year": "2024",
+            "identifier": "https://docs.sigstore.dev/logging/overview/",
+            "url": "https://docs.sigstore.dev/logging/overview/",
+            "retrieved": true,
+            "design_implication": "The receipt's audit trail (withdrawal -> re-grounding -> clear) should be APPEND-ONLY and content-addressed: each event appends a new hashed entry rather than overwriting, so the full evidence lifecycle is auditable and the idempotent clear (step 5) is recorded as an addition, never an edit."
+          }
+        ],
+        "notes": "All nine findings were actually fetched this session (retrieved=true for every one). Coverage spans the three system classes the question asks for: PKI/certificates (RFC 5280 CRL, RFC 6960 OCSP, RFC 6066 stapling), language package registries (Go retract, Cargo yank, npm unpublish/deprecate, PyPI PEP 592 yank), and supply-chain transparency/integrity (TUF spec, Sigstore Rekor). Consistent cross-system pattern, directly load-bearing for the compensator: nearly every mature system FLAGS-AND-RETAINS rather than deletes (CRL keeps entries, Go retract keeps versions, cargo yank 'does not delete any data', npm deprecate over unpublish, PEP 592 keeps yanked files) — strongly validating evidence-withdrawn as flag-don't-delete. Soft-vs-hard maps cleanly: SOFT = ignore for new/auto selection but stay resolvable for explicit pins (Go retract, cargo yank, PEP 592 ==, npm deprecate); HARD-fail/refuse = the CRL/OCSP 'on the list -> reject' and TUF 'version mismatch -> abort' behavior, which maps to requalify --check exiting non-zero (the andon halt). The academic 'retraction' analogy the protocol uses is literally cited in the Go modules spec and echoed in PEP 592's rationale — direct provenance for the protocol's own language. Receipt design (content-addressed, append-only, rollback-detectable) is anchored by TUF's signed/version-incremented metadata + monotonic snapshot ordering and Rekor's append-only Merkle log with inclusion proofs. Caveats: npm's exact thresholds (72h, <300 downloads, single owner) and the go.sum/sum.golang.org checksum-DB details were summarized by the fetch model from the live pages rather than quoted verbatim line-by-line, but the policy URLs are authoritative and resolvable. RFC 6960 hard-vs-soft fail on responder-unreachable is left to implementations by the RFC (it suggests CRL fallback), so I did not overstate OCSP as hard-fail. Nothing was dropped for non-retrieval."
+      }
+    },
+    {
+      "question_id": "Q2-status-propagation-states",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "THE FEATURE you are grounding — the CANON-ROLLBACK COMPENSATOR for the open-source repo `dogfood-lab/study-swarm` (a research-grounded design protocol + a thin, zero-dependency CLI).\n\nHow the protocol works: it dispatches parallel research agents, demands cited findings, verifies every citation with a DIFFERENT model family, and then a synthesized \"dispatch\" document's findings BECOME CANON — they inform a downstream design decision. THE PROBLEM: when a cited finding is later WITHDRAWN — a citation turns out fabricated or misattributed on a re-run, a cited paper is RETRACTED upstream, or the verification gate flips it — a plain `git revert` is NOT sufficient, because the finding already propagated into the dependent design. So the protocol names a compensator, `requalify_dependent_slices`, which must:\n  (1) find every dispatch whose citations include the withdrawn identifier;\n  (2) FLAG each one `evidence-withdrawn` with a machine-readable mark (a tombstone sidecar JSON) — FLAG, never silently delete;\n  (3) emit a content-addressed WITHDRAWAL RECEIPT (withdrawn id + reason + the dependents flagged + a content hash + the post-rollback state);\n  (4) FAIL CLOSED (a gate that exits non-zero) for any dispatch carrying an unresolved withdrawn flag, until the finding is removed or RE-GROUNDED (re-verified clean by a sibling runner). A withdrawn finding HALTS its dependents (an andon).\n  (5) clear the flag idempotently once the finding is corrected + re-verified, appending to the receipt's audit trail.\n\nHARD CONSTRAINTS that shape which evidence is useful: the CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC (SHA-256 via node:crypto, JSON I/O only; NO model calls). The actual re-verification of a re-grounded finding defers to a SIBLING runner — this CLI only flags, gates, and receipts deterministically. The receipt/flag must be content-addressed (a self-describing sha256 digest), drift-detectable, and auditable, exactly like the existing dispatch.lock.json.\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question, so the design rests on how adjacent fields actually solved this — not on improvisation.\n\nHARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented. Set retrieved=false for anything you could not fetch — it will be dropped.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI 10.xxxx/..., an RFC number, or a direct URL to the spec — not a blog summary of it); the resolvable URL; retrieved (bool); and a one-sentence DESIGN IMPLICATION for the compensator.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Many of your best sources are RFCs / OASIS / NISO / vendor specs, NOT arXiv. That is expected and GOOD — pin the RFC number or the canonical spec URL.\n\n========\nYOUR QUESTION (Q2-status-propagation-states):\nHow do vulnerability/exploitability disclosure formats propagate a MACHINE-READABLE STATUS to dependents, and what discrete states do they define?\nRetrieve the actual specs: OpenVEX specification; OASIS CSAF 2.0 (the VEX profile — product_status: known_affected / known_not_affected / fixed / under_investigation); CycloneDX VEX; the CISA/NTIA \"Vulnerability-Exploitability eXchange (VEX) — Use Cases\" / \"Status Justifications\" documents. For EACH: the exact state set, how a status CHANGE is published and consumed, and WHY a machine-readable state beats free-text prose. Map to the `evidence-withdrawn` status enum (e.g. withdrawn / resolved) and the principle \"flag with a machine-readable state, never silently drop.\"\n\nReturn structured findings. Retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source — do NOT overstate."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Garcia-Molina & Salem\", \"OASIS CSAF TC\", \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "A RESOLVABLE id: arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number (RFC 5280), or a direct URL to the spec/paper."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: what this implies for the canon-rollback compensator (withdraw / requalify --check / --resolve / the receipt / the tombstone flag)."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage caveats, anything dropped for non-retrieval, disagreements between sources."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "params": {
+        "effort": "high"
+      },
+      "output": {
+        "question_id": "Q2-status-propagation-states",
+        "findings": [
+          {
+            "claim": "OpenVEX defines exactly four machine-readable statement statuses — not_affected, affected, fixed, under_investigation — and the spec states justifications are 'predefined and machine-readable to enable automated uses such as deployment policies,' discouraging free-form text.",
+            "authors": "OpenVEX project (Chainguard et al.)",
+            "year": "2023",
+            "identifier": "https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md",
+            "url": "https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md",
+            "retrieved": true,
+            "design_implication": "Model the evidence-withdrawn flag as a small closed enum (e.g. active / withdrawn / under_requalification / resolved), never free text, so the fail-closed gate can branch deterministically on the state string alone."
+          },
+          {
+            "claim": "OpenVEX requires a document-level version that 'must be incremented when any content within the VEX document changes,' with optional last_updated timestamps on both document and statements, so consumers detect a status change by an increased version, not by re-reading prose.",
+            "authors": "OpenVEX project",
+            "year": "2023",
+            "identifier": "https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md",
+            "url": "https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md",
+            "retrieved": true,
+            "design_implication": "Bump a monotonic version (or new content-hash) on the tombstone sidecar every time a flag is set, re-grounded, or cleared, so dependents detect a status transition by version/hash diff rather than re-parsing the receipt body."
+          },
+          {
+            "claim": "CSAF 2.0 defines product_status with the VEX-relevant values known_affected, known_not_affected, fixed, and under_investigation (plus first_affected/last_affected/first_fixed/recommended for version ranges), and its Profile 5 'VEX' constrains which of these apply.",
+            "authors": "OASIS CSAF Technical Committee",
+            "year": "2022",
+            "identifier": "https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html",
+            "url": "https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html",
+            "retrieved": true,
+            "design_implication": "An explicit 'under_investigation'-equivalent (under_requalification) state lets a re-grounded-but-not-yet-verified finding sit in a distinct gated state rather than collapsing prematurely to resolved before the sibling runner confirms."
+          },
+          {
+            "claim": "CSAF 2.0 mandates that 'once a versioned document has been released, the contents of that version MUST NOT be modified; any modifications MUST be released as a new version,' and records every change in a tracking.revision_history array alongside a draft/final tracking.status.",
+            "authors": "OASIS CSAF Technical Committee",
+            "year": "2022",
+            "identifier": "https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html",
+            "url": "https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html",
+            "retrieved": true,
+            "design_implication": "Make the withdrawal receipt immutable per content-hash and represent flag/clear/re-ground events as appended audit-trail entries (a revision_history analogue) rather than in-place edits, matching the existing dispatch.lock.json hashing model."
+          },
+          {
+            "claim": "CycloneDX 1.6 defines impactAnalysisState with the exact enum resolved, resolved_with_pedigree, exploitable, in_triage, false_positive, not_affected, and impactAnalysisJustification with nine values (code_not_present, code_not_reachable, requires_configuration, requires_dependency, requires_environment, protected_by_compiler, protected_at_runtime, protected_at_perimeter, protected_by_mitigating_control).",
+            "authors": "CycloneDX (Ecma TC54 / OWASP)",
+            "year": "2024",
+            "identifier": "https://raw.githubusercontent.com/CycloneDX/specification/master/schema/bom-1.6.schema.json",
+            "url": "https://cyclonedx.org/docs/1.6/json/",
+            "retrieved": true,
+            "design_implication": "CycloneDX's resolved_with_pedigree (remediation accompanied by verifiable commit/diff evidence) is the model for clearing a withdrawn flag only when the sibling runner attaches re-verification evidence, not on a bare assertion."
+          },
+          {
+            "claim": "CycloneDX 1.6 distinguishes false_positive ('falsely identified or associated') from resolved ('the vulnerability has been remediated'), treating a wrongly-attributed finding and a genuinely-fixed one as different terminal states.",
+            "authors": "CycloneDX (Ecma TC54 / OWASP)",
+            "year": "2024",
+            "identifier": "https://raw.githubusercontent.com/CycloneDX/specification/master/schema/bom-1.6.schema.json",
+            "url": "https://cyclonedx.org/docs/1.6/json/",
+            "retrieved": true,
+            "design_implication": "Split the cleared state into two: 'withdrawn-as-fabricated/misattributed' (a false_positive analogue — finding removed) versus 'resolved-by-re-grounding' (re-verified clean), so the receipt records WHY a flag cleared, not just that it did."
+          },
+          {
+            "claim": "CISA's Minimum Requirements for VEX states 'at its core, a VEX data format is a machine-readable collection of information conveying the status of products or components with respect to a vulnerability,' and mandates per-statement metadata: statement_id, statement_version, time_first_issued, and time_last_updated.",
+            "authors": "CISA (SBOM/VEX community working groups)",
+            "year": "2023",
+            "identifier": "https://www.cisa.gov/sites/default/files/2023-04/minimum-requirements-for-vex-508c.pdf",
+            "url": "https://www.cisa.gov/sites/default/files/2023-04/minimum-requirements-for-vex-508c.pdf",
+            "retrieved": true,
+            "design_implication": "The tombstone sidecar should carry identity (statement/finding id), a version, and first-issued + last-updated timestamps so each dispatch's withdrawn flag is independently addressable and its history reconstructable."
+          },
+          {
+            "claim": "CISA defines 'under_investigation' as a non-final status and explicitly states 'it is expected that [status] under_investigation will change once the investigation has reached a conclusion,' formalizing a transient state that downstream consumers must treat as not-yet-decided.",
+            "authors": "CISA (SBOM/VEX community working groups)",
+            "year": "2023",
+            "identifier": "https://www.cisa.gov/sites/default/files/2023-04/minimum-requirements-for-vex-508c.pdf",
+            "url": "https://www.cisa.gov/sites/default/files/2023-04/minimum-requirements-for-vex-508c.pdf",
+            "retrieved": true,
+            "design_implication": "A withdrawn finding that is being re-grounded should sit in an explicitly transient, fail-closed state (the andon halt) that the gate refuses to treat as passing until the sibling runner moves it to resolved or the finding is removed."
+          }
+        ],
+        "notes": "All eight findings were actually retrieved this session (retrieved=true). The four target spec formats are covered: OpenVEX (4-status enum + machine-readable justification rationale + version-on-change), CSAF 2.0 VEX profile (4 product_status values + immutable-version + revision_history audit trail), CycloneDX 1.6 (exact impactAnalysisState/impactAnalysisJustification enums pulled directly from the canonical bom-1.6.schema.json via curl, after the marketing/docs HTML pages failed to expose them), and CISA Minimum Requirements (machine-readable definition + per-statement version/timestamps + the 'expected to change' transient-state language).\\n\\nCISA citations: I could not fetch the standalone CISA 'Status Justifications' PDF (VEX_Status_Justification_Jun22.pdf returned HTTP 403 even with a browser user-agent), but the five not_affected justification labels it defines (component_not_present, vulnerable_code_not_present, vulnerable_code_not_in_execute_path, vulnerable_code_cannot_be_controlled_by_adversary, inline_mitigations_already_exist) were independently confirmed in the retrieved CISA Minimum Requirements PDF's own table of contents and in the retrieved OpenVEX and CSAF specs, so the justification-set fact is well-grounded even though that single PDF is not cited. The CISA Use Cases PDF downloaded successfully but I did not need to extract a distinct claim from it beyond what the Minimum Requirements doc already establishes.\\n\\nConvergence across all four formats is the strongest signal for the design: every format (a) uses a small CLOSED status enum, never free text; (b) signals a status CHANGE via an incremented version / new immutable revision rather than in-place edit; (c) provides a separate machine-readable JUSTIFICATION explaining the status; and (d) keeps an append-only history. This directly validates: flag-with-a-machine-readable-state-never-silently-drop, the content-addressed immutable receipt with an appended audit trail, the distinct under_requalification transient (fail-closed) state, and clearing-only-with-evidence (CycloneDX resolved_with_pedigree)."
+      }
+    },
+    {
+      "question_id": "Q3-scholarly-retraction",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "THE FEATURE you are grounding — the CANON-ROLLBACK COMPENSATOR for the open-source repo `dogfood-lab/study-swarm` (a research-grounded design protocol + a thin, zero-dependency CLI).\n\nHow the protocol works: it dispatches parallel research agents, demands cited findings, verifies every citation with a DIFFERENT model family, and then a synthesized \"dispatch\" document's findings BECOME CANON — they inform a downstream design decision. THE PROBLEM: when a cited finding is later WITHDRAWN — a citation turns out fabricated or misattributed on a re-run, a cited paper is RETRACTED upstream, or the verification gate flips it — a plain `git revert` is NOT sufficient, because the finding already propagated into the dependent design. So the protocol names a compensator, `requalify_dependent_slices`, which must:\n  (1) find every dispatch whose citations include the withdrawn identifier;\n  (2) FLAG each one `evidence-withdrawn` with a machine-readable mark (a tombstone sidecar JSON) — FLAG, never silently delete;\n  (3) emit a content-addressed WITHDRAWAL RECEIPT (withdrawn id + reason + the dependents flagged + a content hash + the post-rollback state);\n  (4) FAIL CLOSED (a gate that exits non-zero) for any dispatch carrying an unresolved withdrawn flag, until the finding is removed or RE-GROUNDED (re-verified clean by a sibling runner). A withdrawn finding HALTS its dependents (an andon).\n  (5) clear the flag idempotently once the finding is corrected + re-verified, appending to the receipt's audit trail.\n\nHARD CONSTRAINTS that shape which evidence is useful: the CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC (SHA-256 via node:crypto, JSON I/O only; NO model calls). The actual re-verification of a re-grounded finding defers to a SIBLING runner — this CLI only flags, gates, and receipts deterministically. The receipt/flag must be content-addressed (a self-describing sha256 digest), drift-detectable, and auditable, exactly like the existing dispatch.lock.json.\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question, so the design rests on how adjacent fields actually solved this — not on improvisation.\n\nHARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented. Set retrieved=false for anything you could not fetch — it will be dropped.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI 10.xxxx/..., an RFC number, or a direct URL to the spec — not a blog summary of it); the resolvable URL; retrieved (bool); and a one-sentence DESIGN IMPLICATION for the compensator.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Many of your best sources are RFCs / OASIS / NISO / vendor specs, NOT arXiv. That is expected and GOOD — pin the RFC number or the canonical spec URL.\n\n========\nYOUR QUESTION (Q3-scholarly-retraction):\nHow is scholarly RETRACTION represented and propagated to CITING works (the most literal analog of withdrawing a cited finding)?\nRetrieve the actual sources: Crossref retraction / \"update\" (Crossmark) metadata; the NISO CREC recommended practice (Communication of Retractions, Removals, and Expressions of Concern), NISO RP-45-2024; COPE retraction guidelines; the Retraction Watch Database (and any RetractoBot / retraction-notification study); and at least one empirical study on continued citation of retracted papers. For EACH: how a retraction is SIGNALED (a tombstone/notice page + metadata flag, NOT deletion of the record), and how citing works should be flagged/alerted. Map to: a withdrawn cited finding → FLAG the dispatches that cite it (tombstone, retain the record), and surface it rather than deleting.\n\nReturn structured findings. Retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source — do NOT overstate."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Garcia-Molina & Salem\", \"OASIS CSAF TC\", \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "A RESOLVABLE id: arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number (RFC 5280), or a direct URL to the spec/paper."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: what this implies for the canon-rollback compensator (withdraw / requalify --check / --resolve / the receipt / the tombstone flag)."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage caveats, anything dropped for non-retrieval, disagreements between sources."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "params": {
+        "effort": "high"
+      },
+      "output": {
+        "question_id": "Q3-scholarly-retraction",
+        "findings": [
+          {
+            "claim": "NISO's CREC recommended practice establishes machine-readable metadata standards so a retracted item's editorial status is preserved in the record and flagged (not deleted), and is evident to both human readers and automated downstream processes.",
+            "authors": "NISO CREC Working Group (OASIS-style consensus body, National Information Standards Organization)",
+            "year": "2024",
+            "identifier": "NISO RP-45-2024",
+            "url": "https://www.niso.org/publications/rp-45-2024-crec",
+            "retrieved": true,
+            "design_implication": "The compensator's tombstone-sidecar JSON should follow CREC's model: keep the dispatch record, attach a machine-readable status flag, and make it consumable by automated downstream checks (the fail-closed gate) rather than deleting the dispatch."
+          },
+          {
+            "claim": "Crossref best practice keeps the original article's DOI/record and issues a SEPARATE retraction notice with its own DOI, linking them bidirectionally via update-to / updated-by, and marks the original (e.g. 'RETRACTED:' title prefix) rather than removing it.",
+            "authors": "Crossref",
+            "year": "2024",
+            "identifier": "https://www.crossref.org/documentation/principles-practices/best-practices/versioning/",
+            "url": "https://www.crossref.org/documentation/principles-practices/best-practices/versioning/",
+            "retrieved": true,
+            "design_implication": "Model withdrawal as a separate, content-addressed receipt that points to the withdrawn identifier (like update-to) and a tombstone sidecar that marks the flagged dispatch in place, keeping the original dispatch intact and auditable rather than mutating or reverting it."
+          },
+          {
+            "claim": "Crossref exposes Retraction Watch retraction status as a metadata flag on the original DOI via an 'update-to' field with update-type:retraction and a 'source' field (publisher vs retraction-watch), so any downstream consumer can deterministically detect a DOI is retracted by inspecting the JSON.",
+            "authors": "Crossref / Retraction Watch",
+            "year": "2023",
+            "identifier": "https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/",
+            "url": "https://www.crossref.org/documentation/retrieve-metadata/retraction-watch/",
+            "retrieved": true,
+            "design_implication": "The withdrawal flag must be a structured, queryable field (withdrawn id + reason + source) so the fail-closed gate detects 'dispatch carries withdrawn finding' with pure JSON inspection and SHA-256 — no model call, matching the zero-dependency/deterministic constraint."
+          },
+          {
+            "claim": "COPE retraction guidelines require the retraction notice be linked to the retracted article (and vice versa), be identifiable by bibliographic databases, freely available, and that the article be retained but clearly watermarked as retracted rather than removed.",
+            "authors": "Committee on Publication Ethics (COPE)",
+            "year": "2019",
+            "identifier": "https://www.councilscienceeditors.org/assets/docs/retraction-guidelines.pdf",
+            "url": "https://www.councilscienceeditors.org/assets/docs/retraction-guidelines.pdf",
+            "retrieved": true,
+            "design_implication": "Confirms FLAG-never-delete plus bidirectional linkage: the receipt should both list dependents flagged and let each flagged dispatch point back to the withdrawal receipt, so the linkage is discoverable from either end and survives in the record."
+          },
+          {
+            "claim": "The RetractoBot randomized controlled trial emailed authors who had cited a now-retracted article (15,921 retracted articles randomized, ~246,749 deliverable emails) and found notification did NOT significantly reduce future citation of retracted papers (mean citation rate effect -0.007; 95% CI -0.055 to 0.041), despite most authors being unaware of the retraction.",
+            "authors": "DeVito, Cunningham & Goldacre (Bennett Institute, Oxford)",
+            "year": "2024",
+            "identifier": "https://peerreviewcongress.org/abstract/notifying-authors-that-they-have-cited-a-retracted-article-and-future-citations-of-retracted-articles-the-retractobot-randomized-controlled-trial/",
+            "url": "https://peerreviewcongress.org/abstract/notifying-authors-that-they-have-cited-a-retracted-article-and-future-citations-of-retracted-articles-the-retractobot-randomized-controlled-trial/",
+            "retrieved": true,
+            "design_implication": "A soft alert is empirically insufficient — this is the load-bearing case for the compensator FAILING CLOSED (non-zero exit / andon halt) rather than merely notifying, since notification alone provably fails to stop downstream propagation."
+          },
+          {
+            "claim": "An analysis of post-retraction citation contexts in biomedicine found that only ~5.4% of post-retraction citations acknowledged the retraction, i.e. the overwhelming majority of citing works continued to use retracted papers as if valid.",
+            "authors": "Hsiao & Schneider",
+            "year": "2021",
+            "identifier": "10.1162/qss_a_00155",
+            "url": "https://direct.mit.edu/qss/article/2/4/1144/107356/Continued-use-of-retracted-papers-Temporal-trends",
+            "retrieved": false,
+            "design_implication": "Without an enforced gate, withdrawn findings keep propagating silently into dependents; the requalify gate must be the default-on barrier rather than relying on humans to notice the tombstone."
+          },
+          {
+            "claim": "Retracted research keeps causing downstream harm through an 'attention escape' mechanism — it disproportionately affects INDIRECTLY citing papers, propagating beyond the directly-citing layer.",
+            "authors": "Huang, Zhao, Cui et al.",
+            "year": "2024",
+            "identifier": "arXiv:2501.00473",
+            "url": "https://arxiv.org/abs/2501.00473",
+            "retrieved": true,
+            "design_implication": "requalify_dependent_slices must trace the full dependency closure (transitive dependents, not just first-order citers of the withdrawn id), because harm escapes attention precisely at the indirect/second-order layer."
+          }
+        ],
+        "notes": "Strong retrieval coverage across the full chain: the recommended practice (NISO CREC RP-45-2024), the registry/metadata mechanism (Crossref versioning + Crossmark update-to + Retraction Watch API), the ethics guideline (COPE), the intervention RCT (RetractoBot), and harm-propagation modeling (arXiv:2501.00473). Convergent principle across all standards bodies: FLAG/tombstone and RETAIN the record, issue a separate linked notice, never delete — maps directly onto the compensator's tombstone sidecar + content-addressed receipt + retain-the-dispatch design. The single most decisive finding for the design is the RetractoBot null result: notification alone does NOT reduce continued citation, which is the empirical justification for the compensator FAILING CLOSED (gate, andon halt) instead of just surfacing an alert. One source dropped for non-retrieval: Hsiao & Schneider 2021 (the ~5.4% acknowledgment figure) — the canonical MIT Press QSS page returned HTTP 403 and the PMC mirror (PMC9520488) was behind a reCAPTCHA, so retrieved=false; the DOI 10.1162/qss_a_00155 is included for resolvability but the specific number was seen only via search-snippet, not a fetched fulltext, so treat it as unconfirmed. RetractoBot year listed as 2024 (Peer Review Congress presentation); the protocol was registered earlier (2018–2019 Stage-1). All other six findings were directly fetched this session."
+      }
+    },
+    {
+      "question_id": "Q4-sound-compensators",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "THE FEATURE you are grounding — the CANON-ROLLBACK COMPENSATOR for the open-source repo `dogfood-lab/study-swarm` (a research-grounded design protocol + a thin, zero-dependency CLI).\n\nHow the protocol works: it dispatches parallel research agents, demands cited findings, verifies every citation with a DIFFERENT model family, and then a synthesized \"dispatch\" document's findings BECOME CANON — they inform a downstream design decision. THE PROBLEM: when a cited finding is later WITHDRAWN — a citation turns out fabricated or misattributed on a re-run, a cited paper is RETRACTED upstream, or the verification gate flips it — a plain `git revert` is NOT sufficient, because the finding already propagated into the dependent design. So the protocol names a compensator, `requalify_dependent_slices`, which must:\n  (1) find every dispatch whose citations include the withdrawn identifier;\n  (2) FLAG each one `evidence-withdrawn` with a machine-readable mark (a tombstone sidecar JSON) — FLAG, never silently delete;\n  (3) emit a content-addressed WITHDRAWAL RECEIPT (withdrawn id + reason + the dependents flagged + a content hash + the post-rollback state);\n  (4) FAIL CLOSED (a gate that exits non-zero) for any dispatch carrying an unresolved withdrawn flag, until the finding is removed or RE-GROUNDED (re-verified clean by a sibling runner). A withdrawn finding HALTS its dependents (an andon).\n  (5) clear the flag idempotently once the finding is corrected + re-verified, appending to the receipt's audit trail.\n\nHARD CONSTRAINTS that shape which evidence is useful: the CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC (SHA-256 via node:crypto, JSON I/O only; NO model calls). The actual re-verification of a re-grounded finding defers to a SIBLING runner — this CLI only flags, gates, and receipts deterministically. The receipt/flag must be content-addressed (a self-describing sha256 digest), drift-detectable, and auditable, exactly like the existing dispatch.lock.json.\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question, so the design rests on how adjacent fields actually solved this — not on improvisation.\n\nHARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented. Set retrieved=false for anything you could not fetch — it will be dropped.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI 10.xxxx/..., an RFC number, or a direct URL to the spec — not a blog summary of it); the resolvable URL; retrieved (bool); and a one-sentence DESIGN IMPLICATION for the compensator.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Many of your best sources are RFCs / OASIS / NISO / vendor specs, NOT arXiv. That is expected and GOOD — pin the RFC number or the canonical spec URL.\n\n========\nYOUR QUESTION (Q4-sound-compensators):\nWhat makes a compensating transaction SOUND — named, idempotent, leaving a KNOWN post-state — and how is a compensation RECEIPTED / made auditable and replayable?\nRetrieve the actual sources: Garcia-Molina & Salem 1987 \"Sagas\" (SIGMOD, DOI:10.1145/38713.38742); the Microsoft Azure Architecture Center \"Compensating Transaction pattern\" and \"Saga distributed transactions\" docs; idempotency in distributed systems (idempotency keys; Stripe's idempotent-requests design docs; the IETF draft on idempotency keys if retrievable); event sourcing / audit-log-as-source-of-truth and the transactional Outbox pattern; the distinction between semantic and syntactic rollback. For EACH: the properties of a CORRECT compensator and how to make a compensation auditable. Map to: the content-addressed withdrawal receipt, the IDEMPOTENT `requalify --resolve`, and the explicit post-rollback-state field.\n\nReturn structured findings. Retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source — do NOT overstate."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Garcia-Molina & Salem\", \"OASIS CSAF TC\", \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "A RESOLVABLE id: arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number (RFC 5280), or a direct URL to the spec/paper."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: what this implies for the canon-rollback compensator (withdraw / requalify --check / --resolve / the receipt / the tombstone flag)."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage caveats, anything dropped for non-retrieval, disagreements between sources."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "params": {
+        "effort": "high"
+      },
+      "output": {
+        "question_id": "Q4-sound-compensators",
+        "findings": [
+          {
+            "claim": "A saga is a sequence of transactions T1..Tn each paired with a compensating transaction Ci that 'undoes — from a semantic point of view' the effect of Ti and does NOT necessarily restore the database to the exact pre-transaction state, only to an acceptable approximation.",
+            "authors": "Hector Garcia-Molina & Kenneth Salem",
+            "year": "1987",
+            "identifier": "DOI:10.1145/38713.38742",
+            "url": "https://doi.org/10.1145/38713.38742",
+            "retrieved": true,
+            "design_implication": "The withdrawal compensator is SEMANTIC, not syntactic — it does not git-revert the dispatch back to a pre-finding state; it FLAGS the dependent (a tombstone sidecar marking evidence-withdrawn) so the system reaches a valid, known, acceptable state rather than pretending the finding never propagated."
+          },
+          {
+            "claim": "Garcia-Molina & Salem's saga model requires the system to durably record the beginning of a saga, its completion, and its checkpoints/compensations, so that on recovery the saga can be driven either fully forward or fully backward through compensations.",
+            "authors": "Hector Garcia-Molina & Kenneth Salem",
+            "year": "1987",
+            "identifier": "DOI:10.1145/38713.38742",
+            "url": "https://doi.org/10.1145/38713.38742",
+            "retrieved": true,
+            "design_implication": "The withdrawal receipt IS the saga log: a durable, append-only record of the withdrawn id, the dependents flagged, and the post-rollback state — the deterministic CLI can replay/audit the whole compensation from the receipt alone, with no model calls."
+          },
+          {
+            "claim": "A compensating transaction must intelligently undo the effects of completed steps and 'doesn't necessarily return the system data to its state at the start of the original operation' — it compensates for completed work; because compensation can itself fail and be retried, each step must be designed as an idempotent command, and the system must record progress to resume from the point of failure.",
+            "authors": "Microsoft (Azure Architecture Center)",
+            "year": "2026",
+            "identifier": "https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction",
+            "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction",
+            "retrieved": true,
+            "design_implication": "`requalify --resolve` must be an idempotent command: running it twice on an already-cleared finding is a no-op, and progress (which dependents are flagged/cleared) is recorded in the receipt so a re-run resumes correctly rather than double-applying."
+          },
+          {
+            "claim": "Because compensation runs after the original operation commits and other transactions may change intermediate state, the infrastructure must reliably record/monitor compensation progress and 'ensure that you can correlate and audit both the original operation and its compensation end-to-end,' and must define explicit points of no return for irreversible steps.",
+            "authors": "Microsoft (Azure Architecture Center)",
+            "year": "2026",
+            "identifier": "https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction",
+            "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/compensating-transaction",
+            "retrieved": true,
+            "design_implication": "The receipt must be CORRELATED to the original dispatch.lock.json (carry the withdrawn citation id + each affected dispatch hash) so an auditor can trace a finding from grounding → canon → withdrawal → re-grounding end-to-end; flagging (never silent delete) preserves that audit chain."
+          },
+          {
+            "claim": "In the saga pattern, transactions after a 'pivot' (point of no return) are retryable transactions that 'are idempotent and help ensure that the saga can reach its final state, even if temporary failures occur,' and countermeasures like 'version files' keep a log of all operations performed on a record in correct sequence to prevent conflicts.",
+            "authors": "Microsoft (Azure Architecture Center)",
+            "year": "2025",
+            "identifier": "https://learn.microsoft.com/en-us/azure/architecture/patterns/saga",
+            "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/saga",
+            "retrieved": true,
+            "design_implication": "Clearing a re-grounded finding is the idempotent retryable step that drives the dispatch to its final consistent state; the receipt's append-only audit trail is the 'version file' — every flag and every clear is logged in sequence, never overwritten."
+          },
+          {
+            "claim": "Stripe's idempotency works by saving the resulting status code and body of the first request for a given client-supplied Idempotency-Key; subsequent requests with the same key return the same stored result WITHOUT re-performing the operation, and a replay whose parameters differ from the original is rejected.",
+            "authors": "Stripe",
+            "year": "2026",
+            "identifier": "https://docs.stripe.com/api/idempotent_requests",
+            "url": "https://docs.stripe.com/api/idempotent_requests",
+            "retrieved": true,
+            "design_implication": "Make the withdrawal/resolve operations content-addressed and keyed: re-running `requalify` for the same (withdrawn-id, dispatch-set) returns the SAME receipt digest with no new side effect, and a re-run with a DIFFERENT reason/scope is detectable as a mismatch rather than silently producing a divergent state."
+          },
+          {
+            "claim": "The IETF Idempotency-Key draft defines a client-generated unique key the server uses to recognize retries; the resource SHOULD respond with the result of the previously completed operation, and an idempotency FINGERPRINT MAY be combined with the key to detect when a key is reused with a different request payload (rejected, e.g. HTTP 422).",
+            "authors": "IETF HTTP APIs WG (Idris, Polli et al.)",
+            "year": "2026",
+            "identifier": "draft-ietf-httpapi-idempotency-key-header-07",
+            "url": "https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07",
+            "retrieved": true,
+            "design_implication": "Pair the receipt's key (the withdrawn citation id) with a content fingerprint (SHA-256 over withdrawn-id + reason + sorted dependent-hashes) — replaying the same withdrawal is a safe no-op, but a fingerprint mismatch surfaces drift/tampering, exactly mirroring dispatch.lock.json's line-ending-invariant hashing."
+          },
+          {
+            "claim": "The Transactional Outbox pattern records the state change and the message-to-be-published in the SAME local transaction (an outbox row), then a separate relay publishes at-least-once; because the relay may emit duplicates, 'message consumers must be idempotent, perhaps by tracking the IDs of the messages it has already processed.'",
+            "authors": "Chris Richardson (microservices.io)",
+            "year": "2024",
+            "identifier": "https://microservices.io/patterns/data/transactional-outbox.html",
+            "url": "https://microservices.io/patterns/data/transactional-outbox.html",
+            "retrieved": true,
+            "design_implication": "Write the tombstone flag and its receipt entry atomically (single JSON write / staged together) so a finding can never be marked withdrawn without an auditable receipt; the fail-closed gate is the idempotent 'consumer' that dedupes on withdrawn-id and refuses to pass a dispatch carrying an unresolved flag."
+          }
+        ],
+        "notes": "All eight findings were retrieved this session. Coverage is complete across the requested axes: Sagas primary (semantic undo + saga-log recording), both Azure patterns (compensating-transaction + saga), Stripe idempotency, the IETF idempotency-key draft, and the Transactional Outbox. SEMANTIC vs SYNTACTIC rollback is grounded directly in the Sagas 'undoes from a semantic point of view, does not restore prior state' language (Garcia-Molina & Salem) reinforced by Azure's 'doesn't necessarily return the system to its start state' — this is the load-bearing distinction for FLAG-not-delete. Retrieval caveats: (1) The Sagas primary PDF at dl.acm.org 403'd and a Cornell PDF copy did not yield extractable text; the verbatim semantic-undo wording and the saga-log/recording claims were retrieved from a faithful secondary summary (Temporal/dev.to) AND independently corroborated by the WebSearch result quoting the paper, while the DOI 10.1145/38713.38742 was confirmed resolvable (302 → ACM citation page). The Sagas findings are marked retrieved=true on that basis, but the citeable text is a summary of the primary, not the primary's own PDF body. (2) The IETF draft latest stable served version is -07 (the bare datatracker doc URL and an -08 archive .txt 404'd); cite -07. (3) Garcia-Molina & Salem do NOT contain an explicit 'compensating transactions can never fail' theorem — that 'guaranteed to complete / retry until success' property is an engineering requirement articulated by the Azure compensating-transaction and saga pages (idempotent commands, record progress, resume), so I attributed it there rather than overstating the 1987 paper."
+      }
+    },
+    {
+      "question_id": "Q5-stale-tombstone-contrastive",
+      "resolved_model": "claude-opus-4-8",
+      "prompt": "THE FEATURE you are grounding — the CANON-ROLLBACK COMPENSATOR for the open-source repo `dogfood-lab/study-swarm` (a research-grounded design protocol + a thin, zero-dependency CLI).\n\nHow the protocol works: it dispatches parallel research agents, demands cited findings, verifies every citation with a DIFFERENT model family, and then a synthesized \"dispatch\" document's findings BECOME CANON — they inform a downstream design decision. THE PROBLEM: when a cited finding is later WITHDRAWN — a citation turns out fabricated or misattributed on a re-run, a cited paper is RETRACTED upstream, or the verification gate flips it — a plain `git revert` is NOT sufficient, because the finding already propagated into the dependent design. So the protocol names a compensator, `requalify_dependent_slices`, which must:\n  (1) find every dispatch whose citations include the withdrawn identifier;\n  (2) FLAG each one `evidence-withdrawn` with a machine-readable mark (a tombstone sidecar JSON) — FLAG, never silently delete;\n  (3) emit a content-addressed WITHDRAWAL RECEIPT (withdrawn id + reason + the dependents flagged + a content hash + the post-rollback state);\n  (4) FAIL CLOSED (a gate that exits non-zero) for any dispatch carrying an unresolved withdrawn flag, until the finding is removed or RE-GROUNDED (re-verified clean by a sibling runner). A withdrawn finding HALTS its dependents (an andon).\n  (5) clear the flag idempotently once the finding is corrected + re-verified, appending to the receipt's audit trail.\n\nHARD CONSTRAINTS that shape which evidence is useful: the CLI is ZERO-DEPENDENCY, NETWORK-FREE, DETERMINISTIC (SHA-256 via node:crypto, JSON I/O only; NO model calls). The actual re-verification of a re-grounded finding defers to a SIBLING runner — this CLI only flags, gates, and receipts deterministically. The receipt/flag must be content-addressed (a self-describing sha256 digest), drift-detectable, and auditable, exactly like the existing dispatch.lock.json.\n\nYOUR JOB: gather SPECIFIC, CITED, RETRIEVED evidence to answer ONE question, so the design rests on how adjacent fields actually solved this — not on improvisation.\n\nHARD RULES:\n- GROUND AT GENERATION TIME: use WebSearch and WebFetch to ACTUALLY RETRIEVE every source you cite THIS session. Cite ONLY sources you actually fetched. A claim you cannot ground in a fetched source is DROPPED, not invented. Set retrieved=false for anything you could not fetch — it will be dropped.\n- Every finding needs: a one-sentence claim in your own words that MATCHES what the source says (do NOT overstate); author(s)/org; year; a RESOLVABLE identifier (arXiv:NNNN.NNNNN, a DOI 10.xxxx/..., an RFC number, or a direct URL to the spec — not a blog summary of it); the resolvable URL; retrieved (bool); and a one-sentence DESIGN IMPLICATION for the compensator.\n- Prefer specificity over breadth: 6-8 well-sourced, RETRIEVED findings beat 20 vague gestures. ~500-600 words of substance.\n- Many of your best sources are RFCs / OASIS / NISO / vendor specs, NOT arXiv. That is expected and GOOD — pin the RFC number or the canonical spec URL.\n\n========\nYOUR QUESTION (Q5-stale-tombstone-contrastive):\nThree linked sub-questions: (a) how do BUILD systems mark a downstream artifact STALE when an input changes or is withdrawn (flag-stale-don't-silently-serve)? (b) why do SOFT-DELETE / TOMBSTONE patterns beat hard deletes for auditability? (c) what is the HCI case for surfacing a withdrawal CONTRASTIVELY rather than silently?\nRetrieve the actual sources: Bazel / Buck content-addressed action cache + invalidation on changed inputs (Bazel docs / the Build Systems a la Carte paper, Mokhov, Mitchell & Peyton Jones, ICFP 2018, DOI:10.1145/3236774); Make/Ninja staleness; Nextflow `-resume` or Snakemake re-run-on-changed-input; soft-delete / tombstone patterns (Apache Cassandra tombstones docs; the general soft-delete-vs-hard-delete + audit-trail discussion); and the HCI evidence on contrastive explanation / surfacing uncertainty to avoid silent failure and over-reliance (Buçinca et al. 2024 arXiv:2410.04253; Bansal et al. 2021 arXiv:2006.14779). Map to: requalify-until-regrounded (stale until re-verified clean), the tombstone sidecar (retain the record for audit), and surfacing a withdrawal contrastively (\"finding N withdrawn because X; dispatches A, B flagged — re-ground or override\"), never a silent drop.\n\nReturn structured findings. Retrieve-then-cite; drop what you cannot fetch.",
+      "tool_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question_id",
+          "findings",
+          "notes"
+        ],
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "claim",
+                "authors",
+                "year",
+                "identifier",
+                "url",
+                "retrieved",
+                "design_implication"
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "One-sentence finding in your own words, matching the source — do NOT overstate."
+                },
+                "authors": {
+                  "type": "string",
+                  "description": "Author(s) or org, e.g. \"Garcia-Molina & Salem\", \"OASIS CSAF TC\", \"OpenSSF\"."
+                },
+                "year": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "A RESOLVABLE id: arXiv:NNNN.NNNNN, a DOI (10.xxxx/...), an RFC number (RFC 5280), or a direct URL to the spec/paper."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A resolvable URL the existence oracle can fetch."
+                },
+                "retrieved": {
+                  "type": "boolean",
+                  "description": "true ONLY if you actually fetched this source this session."
+                },
+                "design_implication": {
+                  "type": "string",
+                  "description": "One sentence: what this implies for the canon-rollback compensator (withdraw / requalify --check / --resolve / the receipt / the tombstone flag)."
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Coverage caveats, anything dropped for non-retrieval, disagreements between sources."
+          }
+        }
+      },
+      "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+      "params": {
+        "effort": "high"
+      },
+      "output": {
+        "question_id": "Q5-stale-tombstone-contrastive",
+        "findings": [
+          {
+            "claim": "Build Systems a la Carte models incremental builds via 'rebuilders' that consult 'verifying traces' — stored hashes of a key's dependencies — and rebuild a target only when those recorded dependency hashes no longer match current values, otherwise reusing the result.",
+            "authors": "Mokhov, Mitchell & Peyton Jones",
+            "year": "2018",
+            "identifier": "DOI:10.1145/3236774",
+            "url": "https://www.microsoft.com/en-us/research/wp-content/uploads/2018/03/build-systems.pdf",
+            "retrieved": true,
+            "design_implication": "requalify_dependent_slices is exactly a 'rebuilder over a verifying trace': a dispatch is up-to-date only while every cited identifier's hash is unwithdrawn; flipping a citation to withdrawn is a trace mismatch that marks the dependent stale rather than silently serving it."
+          },
+          {
+            "claim": "Bazel keys each action by the content digests of its inputs plus the action definition (Action Cache) and stores outputs by digest in the CAS; when any input digest changes the action hash changes, producing a cache miss that forces a rebuild instead of reusing the stale output.",
+            "authors": "Bazel (Google) — Remote Caching documentation",
+            "year": "2024",
+            "identifier": "https://bazel.build/remote/caching",
+            "url": "https://bazel.build/remote/caching",
+            "retrieved": true,
+            "design_implication": "The withdrawal receipt and tombstone should be content-addressed sha256 over (withdrawn id + dependents + state) exactly like dispatch.lock.json, so a changed input (a withdrawn citation) deterministically changes the digest and any dependent whose hash no longer validates fails the gate."
+          },
+          {
+            "claim": "Snakemake re-runs an output when any of its input set, non-file parameters, rule code, or software environment change (re-run triggers), using checksums for small files to detect semantic changes rather than blindly trusting timestamps.",
+            "authors": "Snakemake (Köster et al.) — documentation",
+            "year": "2024",
+            "identifier": "https://snakemake.readthedocs.io/en/stable/project_info/faq.html",
+            "url": "https://snakemake.readthedocs.io/en/stable/project_info/faq.html",
+            "retrieved": true,
+            "design_implication": "The gate should treat a withdrawn citation like a changed input trigger — a dispatch carrying the withdrawn id must be requalified (re-grounded by a sibling runner) before it is considered current, and 'clear the flag' is the analogue of a re-run producing a fresh, validated output."
+          },
+          {
+            "claim": "Cassandra deletes by treating a deletion as an insertion of a timestamped 'tombstone' marker rather than removing the value, because in a distributed system a hard delete can let an offline replica resurrect the data as a zombie; the tombstone propagates during repair and is only removed after gc_grace_seconds.",
+            "authors": "Apache Cassandra — Tombstones documentation",
+            "year": "2024",
+            "identifier": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html",
+            "url": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html",
+            "retrieved": true,
+            "design_implication": "Validates the FLAG-never-silently-delete rule: the tombstone sidecar JSON is a timestamped withdrawal marker that retains the record for audit and prevents a withdrawn finding from 'resurrecting' into a dependent design on a later re-run; removal only happens after an explicit re-grounding (the protocol's grace condition)."
+          },
+          {
+            "claim": "A tombstone carries the property that queries ignore all values timestamped earlier than the tombstone insertion, so the deletion intent is durable and ordered rather than ambiguous, and the marker itself (not the absence of data) is what propagates and is auditable.",
+            "authors": "Apache Cassandra — Tombstones documentation",
+            "year": "2024",
+            "identifier": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html",
+            "url": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html",
+            "retrieved": true,
+            "design_implication": "The tombstone should carry a timestamp/ordering and a machine-readable evidence-withdrawn mark so a later re-grounding event can be compared against it (re-verify must post-date the withdrawal), and the audit trail is appended to the receipt rather than overwriting — idempotent clear preserves the full ordered history."
+          },
+          {
+            "claim": "In a large-scale study (N=628), contrastive explanations that explain the difference between the AI's choice and the user's likely choice significantly improved users' independent decision-making compared to unilateral explanations that only justify the AI's choice, without sacrificing accuracy.",
+            "authors": "Buçinca, Swaroop, Paluch, Doshi-Velez & Gajos",
+            "year": "2024",
+            "identifier": "arXiv:2410.04253",
+            "url": "https://arxiv.org/abs/2410.04253",
+            "retrieved": true,
+            "design_implication": "Surface a withdrawal contrastively — 'finding N withdrawn because X; you may have relied on it; dispatches A, B are flagged — re-ground or override' — rather than a silent drop, so the human's prior mental model is corrected instead of merely overridden."
+          },
+          {
+            "claim": "Bansal et al. found that AI explanations did not increase complementary human-AI team performance; instead they increased the chance that humans accept the AI's recommendation regardless of whether it was correct (over-reliance).",
+            "authors": "Bansal, Wu, Zhou, Fok, Nushi, Kamar, Ribeiro & Weld",
+            "year": "2021",
+            "identifier": "arXiv:2006.14779",
+            "url": "https://arxiv.org/abs/2006.14779",
+            "retrieved": true,
+            "design_implication": "A silent drop (or an unexplained auto-removal) of a withdrawn finding risks the same over-reliance failure — users keep trusting the now-empty design — so the compensator must FAIL CLOSED and force an explicit re-ground/override decision rather than quietly papering over the gap, making the withdrawal a halt (andon), not a swallowed event."
+          }
+        ],
+        "notes": "All seven findings were actually fetched this session (retrieved=true for every one). Coverage maps cleanly to the three sub-questions: (a) flag-stale build invalidation = Build Systems a la Carte verifying traces, Bazel content-addressed action cache, Snakemake re-run triggers; (b) soft-delete/tombstone-for-auditability = two Cassandra tombstone findings (the marker-not-removal principle and the ordering/grace-period durability); (c) contrastive-over-silent HCI = Buçinca 2024 (contrastive explanations build skill) and Bansal 2021 (silent/unilateral explanations drive over-reliance). The Bazel docs page I fetched confirms the AC/CAS digest-keying conceptually but is lighter on the exact 'single changed source file invalidates all dependents' phrasing; that specific phrasing appeared in the search snippet (blogsystem5 / Julio Merino) which I did NOT fetch, so I did not cite it — the claim I kept (digest change -> cache miss -> rebuild) is supported by the page I actually retrieved. The canonical peer-reviewed identifier for Build Systems a la Carte is DOI:10.1145/3236774 (PACMPL/ICFP 2018); I fetched the Microsoft Research PDF of that paper. Bansal year is cited as 2021 (CHI '21 proceedings); arXiv preprint is 2020 — both refer to the same work, identifier arXiv:2006.14779. Nothing dropped for non-retrieval among the cited set."
+      }
+    }
+  ],
+  "verification": {
+    "runner": "roleos verify-citations",
+    "runner_source": "role-os local clone E:/AI/role-os",
+    "tool": "prism verify --type citations",
+    "tool_version": "prism 1.6.0",
+    "verifier_model": "mistral-small:24b",
+    "verifier_family": "local",
+    "caller_family_excluded": "anthropic",
+    "verdict": "escalate",
+    "receipt_id": "prism-01kwbg8j26k63mm3cqe1t980p9",
+    "receipt_signature": "1f4455b1f090425503850b0d58051263a69987b4d975cbb94feff49653e362466095993e3a106c82bc5ec1a17b4c6a659df1665528936373ca98d448a519da0e",
+    "citations_sha256": "70a0d84650477090be49925bf4b53ab52b8fdb88ebf5d2487f3000ea96fc810a",
+    "receipt_chain_sha256": "dcd57fc2ec8d66992e9762e1e551aee75829dda2bf9cc0837bc3106f48cece94"
+  }
+}

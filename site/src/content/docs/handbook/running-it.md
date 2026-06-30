@@ -48,6 +48,9 @@ npm i -g @dogfood-lab/study-swarm      # or: npx @dogfood-lab/study-swarm <comma
 | `study-swarm lint [--json] <path…>` | Check a dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | Write `<dispatch>.lock.json` — pin (per Step-2 agent) the resolved model id + SHA-256 of the byte-exact prompt + SHA-256 of the tool schema, plus the Step-4 verifier receipt, in one `lock_sha256`. |
 | `study-swarm lock --verify <dispatch> [--from …]` | Re-derive the hashes and assert they match the lock; drift exits `1`. Without `--from`, checks the lock's own integrity. |
+| `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | Flag every dispatch citing `<id>` as `evidence-withdrawn` (a tombstone sidecar — flag, never delete) and emit a content-addressed withdrawal receipt. `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`. |
+| `study-swarm requalify --check <corpus-dir>` | Fail closed (exit `1`) for any unresolved `evidence-withdrawn` flag — the andon that halts a withdrawn finding's dependents. |
+| `study-swarm requalify --resolve <dispatch> <id> --mode removed\|regrounded [--note …]` | Clear a flag once the finding is removed or re-grounded. Idempotent; appends to the sidecar's audit trail. |
 
 A typical loop:
 
@@ -100,3 +103,20 @@ study-swarm lock --verify my-decision.dispatch.md --from my-decision.orchestrati
 The **harness emits** the orchestration record (the resolved models, the byte-exact prompts, the tool schemas, the verifier receipt); the CLI stays zero-dependency and network-free, only canonicalizing (RFC 8785 JCS, NFC-normalized, no BOM — so the same dispatch hashes identically on Windows, macOS, and Linux), hashing (SHA-256, self-describing `sha256-…` digests), and validating. `lock --verify` re-derives every hash and **fails closed** on a changed prompt, a swapped model, a shifted tool surface, edited dispatch text, or a tampered lock — so it gates CI exactly like a package lockfile.
 
 **It pins inputs, not outputs.** Pinning model + prompt + temperature does not make an LLM's output bit-identical — batch-invariance, floating-point non-associativity, mixture-of-experts routing, and silent provider drift are all outside an offline tool's control. So the lock gives you **replayable inputs and drift-detectable outputs**, never "deterministic replay." The full design, grounded citation by citation and gated through the verifier, is the worked dispatch [`examples/study-swarm-lock.dispatch.md`](https://github.com/dogfood-lab/study-swarm/blob/main/examples/study-swarm-lock.dispatch.md) — the first dispatch to ship its own lock.
+
+## Roll back a withdrawn finding
+
+A verified finding becomes **canon** — it informs a downstream decision. So what happens when it is later **withdrawn**: a citation turns out fabricated or misattributed on a re-run, a cited paper is **retracted** upstream, or the gate flips it? A `git revert` of the dispatch commit is not enough, because the finding already propagated into the dependent design — "a compensator undoes from a semantic point of view; it does not restore the prior state" (Garcia-Molina & Salem 1987, the saga heritage). The **canon-rollback compensator** makes the cleanup executable as three deterministic, network-free verbs:
+
+```bash
+study-swarm withdraw arXiv:2402.15089 --reason misattributed --from dispatches/ --receipt rollback.json
+#   → flags every dispatch citing it `evidence-withdrawn` (a co-located tombstone sidecar
+#     <slug>.withdrawn.json — flag, never delete) and writes a content-addressed receipt.
+study-swarm requalify --check dispatches/          # exit 1 while any flag is unresolved — the andon HALT
+study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed
+#   or, if the finding was re-verified in place:  --mode regrounded --note "<sibling-runner attestation>"
+```
+
+The design rests on how adjacent fields actually solved this. **Flag, never delete** is the universal pattern for a thing with dependents — an X.509 CRL retains the revoked serial with a reason code (RFC 5280), `cargo yank` "does not delete any data," npm recommends `deprecate` over `unpublish`, PyPI keeps yanked files (PEP 592), Cassandra writes a tombstone, and COPE/Crossref retain the retracted record. **Fail-closed, not a soft alert**, because notifying citing authors provably did *not* reduce continued citation of retracted work (the RetractoBot RCT, DeVito et al. 2024) and unexplained drops drive over-reliance (Bansal et al. 2021) — so `requalify --check` refuses to treat a missing re-verification as "fine" (the Must-Staple rule, RFC 7633). The **reason is a closed machine-readable enum**, never free text (OpenVEX / CSAF / CycloneDX), and the receipt and tombstone are **content-addressed and append-only** (TUF, Sigstore Rekor, RFC 6962, Git objects). The withdrawal is surfaced **contrastively**, never silently (Buçinca et al. 2024).
+
+**Honest ceiling:** the CLI flags, gates, and receipts deterministically; the actual **re-verification** of a re-grounded finding is the sibling runner's job (`roleos verify-citations` → prism) — `--mode regrounded` records that it happened, it does not perform it. The tombstone is the *evidence* layer; `lock --verify` is untouched by a withdraw. The full design, grounded citation by citation and gated through the verifier, is the worked dispatch [`examples/study-swarm-canon-rollback.dispatch.md`](https://github.com/dogfood-lab/study-swarm/blob/main/examples/study-swarm-canon-rollback.dispatch.md) — the first dispatch to be withdrawn-then-requalified.

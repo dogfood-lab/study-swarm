@@ -290,6 +290,142 @@ try {
     const exO = resolve(__dirname, '../examples/study-swarm-lock.orchestration.json');
     eq(run(['lock', '--verify', exD, '--from', exO]).code, 0, 'exit');
   });
+
+  // --- canon-rollback: the requalify_dependent_slices compensator ---
+  // Helpers: a dispatch citing a given identifier, and JSON readers for the sidecar/receipt.
+  const GROUND = (id) => `## Research grounding\n1. **A finding.** Zhu et al. 2024 (${id}). Implication.\n`;
+  const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
+  const FIND_ID = 'arXiv:2402.15089'; // a real id; matched case- and form-insensitively (normIdent)
+
+  check('withdraw requires --reason (exit 2)', () => {
+    const d = join(work, 'wd1'); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    eq(run(['withdraw', FIND_ID, '--from', d]).code, 2, 'exit');
+  });
+  check('withdraw rejects an off-enum --reason (exit 2)', () => {
+    const d = join(work, 'wd2'); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    eq(run(['withdraw', FIND_ID, '--reason', 'bogus', '--from', d]).code, 2, 'exit');
+  });
+  check('withdraw on an id no dispatch cites (exit 2)', () => {
+    const d = join(work, 'wd3'); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'a.dispatch.md'), '# a\n\n' + GROUND('arXiv:2310.01798'));
+    eq(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', d]).code, 2, 'exit');
+  });
+
+  // THE ROLLBACK META-TEST — a compensator that can't flag + gate is theater. Two dispatches cite
+  // the SAME id (in DIFFERENT citation forms): withdraw flags BOTH and check goes RED; re-ground one
+  // and it goes GREEN while the other stays RED. (testing-os "prove the gate goes red", for rollback.)
+  check('ROLLBACK META-TEST: withdraw flags every dependent, check goes RED, re-ground one -> GREEN while the other stays RED', () => {
+    const c = join(work, 'rollback'); mkdirSync(c, { recursive: true });
+    // alpha cites the bare arXiv id; beta cites the arxiv.org URL form (+version) — normIdent unifies them.
+    writeFileSync(join(c, 'alpha.dispatch.md'), '# alpha\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n2. **Shared.** Zhu et al. 2024 (arXiv:2402.15089). Impl.\n');
+    writeFileSync(join(c, 'beta.dispatch.md'), '# beta\n\n## Research grounding\n1. **Shared via URL form.** Zhu et al. 2024 (https://arxiv.org/abs/2402.15089v2). Impl.\n');
+    // 1) withdraw flags BOTH (cross-form match) and emits a receipt naming both dependents.
+    const rcp = join(c, 'receipt.json');
+    const w = run(['withdraw', FIND_ID, '--reason', 'misattributed', '--detail', 'Fang -> Zhu', '--from', c, '--receipt', rcp]);
+    eq(w.code, 0, 'withdraw exit');
+    if (!/you may have relied/i.test(w.stdout) || !/re-ground or override/i.test(w.stdout)) throw new Error('withdraw output is not contrastive');
+    if (!existsSync(join(c, 'alpha.withdrawn.json')) || !existsSync(join(c, 'beta.withdrawn.json'))) throw new Error('both sidecars not written');
+    const receipt = readJson(rcp);
+    if (receipt.dependents.length !== 2) throw new Error(`receipt should name 2 dependents, got ${receipt.dependents.length}`);
+    if (!/^sha256-/.test(receipt.receipt_sha256)) throw new Error('receipt not content-addressed');
+    // 2) the gate is RED for the whole corpus (2 unresolved).
+    eq(run(['requalify', '--check', c]).code, 1, 'check RED with 2 unresolved');
+    // 3) re-ground alpha by REMOVING the finding, then resolve --mode removed.
+    writeFileSync(join(c, 'alpha.dispatch.md'), '# alpha\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    eq(run(['requalify', '--resolve', join(c, 'alpha.dispatch.md'), FIND_ID, '--mode', 'removed']).code, 0, 'resolve removed exit');
+    // 4) alpha is now GREEN; the corpus is still RED because beta is unresolved.
+    eq(run(['requalify', '--check', join(c, 'alpha.withdrawn.json')]).code, 0, 'alpha GREEN');
+    const corpusCheck = run(['requalify', '--check', c]);
+    eq(corpusCheck.code, 1, 'corpus still RED (beta unresolved)');
+    if (!/beta\.dispatch\.md/.test(corpusCheck.stderr)) throw new Error('RED check should still name beta');
+    if (/alpha\.dispatch\.md/.test(corpusCheck.stderr)) throw new Error('alpha should no longer be flagged');
+    // post-state assertions on the sidecars themselves
+    const a = readJson(join(c, 'alpha.withdrawn.json'));
+    const b = readJson(join(c, 'beta.withdrawn.json'));
+    if (a.withdrawals[0].status !== 'resolved' || a.withdrawals[0].resolution.mode !== 'removed') throw new Error('alpha not resolved/removed');
+    if (b.withdrawals[0].status !== 'withdrawn') throw new Error('beta should still be withdrawn');
+  });
+
+  check('resolve --mode removed FAILS while the finding is still present (fail-closed, exit 1)', () => {
+    const c = join(work, 'res-guard'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    eq(run(['requalify', '--resolve', join(c, 'a.dispatch.md'), FIND_ID, '--mode', 'removed']).code, 1, 'exit');
+  });
+  check('resolve --mode regrounded requires --note (exit 2), succeeds with one (exit 0)', () => {
+    const c = join(work, 're-ground'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'misattributed', '--from', c]);
+    eq(run(['requalify', '--resolve', join(c, 'a.dispatch.md'), FIND_ID, '--mode', 'regrounded']).code, 2, 'no --note exit');
+    eq(run(['requalify', '--resolve', join(c, 'a.dispatch.md'), FIND_ID, '--mode', 'regrounded', '--note', 'prism receipt X, re-verified clean']).code, 0, 'with --note exit');
+  });
+  check('resolve is idempotent (re-running is a no-op, version unchanged, exit 0)', () => {
+    const c = join(work, 'idem'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND('arXiv:2310.01798'));
+    run(['withdraw', 'arXiv:2310.01798', '--reason', 'fabricated', '--from', c]);
+    // remove and resolve
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n## Research grounding\n1. **Other.** Rajan 2025 (arXiv:2511.16708). Impl.\n');
+    eq(run(['requalify', '--resolve', join(c, 'a.dispatch.md'), 'arXiv:2310.01798', '--mode', 'removed']).code, 0, 'first resolve');
+    const v1 = readJson(join(c, 'a.withdrawn.json')).version;
+    eq(run(['requalify', '--resolve', join(c, 'a.dispatch.md'), 'arXiv:2310.01798', '--mode', 'removed']).code, 0, 'second resolve (no-op)');
+    const v2 = readJson(join(c, 'a.withdrawn.json')).version;
+    if (v1 !== v2) throw new Error(`idempotent resolve bumped version: ${v1} -> ${v2}`);
+  });
+  check('withdraw is deterministic + idempotent (same inputs -> same receipt_sha256)', () => {
+    const c = join(work, 'det'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    const h1 = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c, '--json']).stdout).receipt_sha256;
+    const h2 = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c, '--json']).stdout).receipt_sha256;
+    if (h1 !== h2) throw new Error(`nondeterministic receipt: ${h1} != ${h2}`);
+  });
+  check('requalify --check catches a hand-edited sidecar (self-integrity, RED)', () => {
+    const c = join(work, 'tamper'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    const p = join(c, 'a.withdrawn.json');
+    const o = readJson(p); o.withdrawals[0].status = 'resolved'; // forge a clear, leave the hash stale
+    writeFileSync(p, JSON.stringify(o, null, 2));
+    const r = run(['requalify', '--check', c]);
+    eq(r.code, 1, 'exit');
+    if (!/self-integrity/.test(r.stderr)) throw new Error('did not catch the sidecar tamper');
+  });
+  check('withdraw is line-ending invariant (CRLF dispatch -> same receipt_sha256 as LF)', () => {
+    const body = '# a\n\n' + GROUND(FIND_ID);
+    const lf = join(work, 'lf'); mkdirSync(join(lf, 'c'), { recursive: true });
+    writeFileSync(join(lf, 'c', 'a.dispatch.md'), body);
+    const hLf = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', join(lf, 'c'), '--json']).stdout).receipt_sha256;
+    const crlf = join(work, 'crlf'); mkdirSync(join(crlf, 'c'), { recursive: true });
+    writeFileSync(join(crlf, 'c', 'a.dispatch.md'), body.replace(/\n/g, '\r\n')); // same content, CRLF
+    const hCrlf = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', join(crlf, 'c'), '--json']).stdout).receipt_sha256;
+    if (hLf !== hCrlf) throw new Error(`receipt not line-ending invariant: ${hLf} != ${hCrlf}`);
+  });
+  // DECOMPOSE_BY_SECRETS boundary: the compensator works the VOLATILE evidence layer; the STABLE
+  // lock is untouched. A withdraw + resolve must NOT disturb `lock --verify`.
+  check('DECOMPOSE boundary: lock --verify is unaffected by withdraw + resolve', () => {
+    const c = join(work, 'decomp'); mkdirSync(c, { recursive: true });
+    const dp = join(c, 'a.dispatch.md');
+    writeFileSync(dp, '# a\n\n' + GROUND(FIND_ID));
+    const op = join(c, 'a.orchestration.json');
+    writeFileSync(op, JSON.stringify({
+      steps: [{ question_id: 'Q1', resolved_model: 'claude-opus-4-8', prompt: 'P', tool_schema: { type: 'object' } }],
+    }));
+    eq(run(['lock', dp, '--from', op]).code, 0, 'build lock');
+    eq(run(['lock', '--verify', dp, '--from', op]).code, 0, 'lock verifies before withdraw');
+    eq(run(['withdraw', FIND_ID, '--reason', 'misattributed', '--from', c]).code, 0, 'withdraw');
+    eq(run(['lock', '--verify', dp, '--from', op]).code, 0, 'lock STILL verifies after withdraw (stable layer untouched)');
+    eq(run(['requalify', '--resolve', dp, FIND_ID, '--mode', 'regrounded', '--note', 're-verified']).code, 0, 'resolve');
+    eq(run(['lock', '--verify', dp, '--from', op]).code, 0, 'lock STILL verifies after resolve');
+  });
+  check('the shipped canon-rollback example lints clean (exit 0)', () => {
+    eq(run(['lint', resolve(__dirname, '../examples/study-swarm-canon-rollback.dispatch.md')]).code, 0, 'exit');
+  });
+  check('the shipped canon-rollback example lock verifies clean (exit 0)', () => {
+    const exD = resolve(__dirname, '../examples/study-swarm-canon-rollback.dispatch.md');
+    const exO = resolve(__dirname, '../examples/study-swarm-canon-rollback.orchestration.json');
+    eq(run(['lock', '--verify', exD, '--from', exO]).code, 0, 'exit');
+  });
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

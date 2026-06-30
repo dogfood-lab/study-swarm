@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-06-30
+
+Makes the **canon-rollback** executable. A verified finding becomes canon — it informs a downstream design decision — so when it is later **withdrawn** (a citation turns out fabricated/misattributed on a re-run, a cited paper is retracted, or the gate flips it) a `git revert` is not enough: the finding already propagated. This release ships the protocol's named `requalify_dependent_slices` compensator as three deterministic, network-free verbs. The design was grounded by running study-swarm on this feature itself — five load-bearing questions (revocation propagation, machine-readable status states, scholarly retraction, sound compensators, build-system staleness/tombstones/contrastive surfacing) dispatched to parallel retrieval-grounded agents; all 27 findings were gated through Step 4 (`roleos verify-citations` → prism, a different model family, reasoning-stripped) with a public-key-verified Ed25519 receipt before any informed the design.
+
+### Added
+
+- **`study-swarm withdraw <identifier> --reason <reason> [--detail <text>] [--from <dir>] [--receipt <path>]`** — scans the corpus for every dispatch whose *Research grounding* cites `<identifier>` (identifier-normalized across arXiv / DOI / RFC / URL forms), flags each as `evidence-withdrawn` in a co-located tombstone sidecar `<slug>.withdrawn.json` (**flag, never delete**) with a closed machine-readable `--reason` (`fabricated` / `misattributed` / `retracted` / `verifier-flipped` / `other`), and emits a content-addressed withdrawal receipt (the withdrawn id + reason + every dependent flagged + a `receipt_sha256` + the post-rollback state).
+- **`study-swarm requalify --check <corpus-dir>`** — fails closed (exit `1`) for any dispatch carrying an unresolved `evidence-withdrawn` flag — the andon that **halts** a withdrawn finding's dependents until it is removed or re-grounded. Also catches a hand-edited sidecar via self-integrity. Gates CI.
+- **`study-swarm requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]`** — clears a flag once the finding is removed (deterministically checked) or re-grounded (`--note` records the sibling-runner re-verification attestation; the CLI does not itself re-verify). **Idempotent**, and **appends** to the sidecar's append-only audit trail rather than editing in place.
+- A worked, runner-verified reference dispatch — `examples/study-swarm-canon-rollback.dispatch.md` (27 cited findings) — with its harness record (`examples/study-swarm-canon-rollback.orchestration.json`) and lock (`examples/study-swarm-canon-rollback.lock.json`); the first dispatch to ship a lock **and** be withdrawn-then-requalified.
+- Smoke coverage proving the rollback round-trips: a meta-test seeds two dispatches citing one identifier, withdraws it (both go `evidence-withdrawn`, `requalify --check` goes **RED**), re-grounds one (it goes **GREEN** while the other stays **RED**), plus determinism, idempotency, self-integrity tamper, line-ending invariance, and a DECOMPOSE boundary test proving `lock --verify` is unaffected by a withdraw/resolve.
+
+### Changed
+
+- `PROTOCOL.md` adds a **"Compensating a withdrawn finding (canon-rollback)"** section — the executable shape of `requalify_dependent_slices` and its honest ceiling.
+
+### Honest ceiling
+
+The CLI **flags, gates, and receipts deterministically** (file reads, JSON I/O, SHA-256 — zero-dependency, network-free). The actual **re-verification** of a re-grounded finding is the sibling runner's job (`roleos verify-citations` → prism), not this package; `requalify --resolve --mode regrounded` records that it happened, it does not perform it. The tombstone is the volatile evidence layer and never touches the stable `PROTOCOL.md`/lock shape. Grounded in Garcia-Molina & Salem 1987 (Sagas, DOI:10.1145/38713.38742), RFC 5280 / RFC 6066 / RFC 7633, OpenVEX & CSAF 2.0 & CycloneDX 1.6, NISO CREC RP-45-2024, the RetractoBot RCT (DeVito et al. 2024), Mokhov, Mitchell & Peyton Jones 2018 (DOI:10.1145/3236774), Buçinca et al. 2024 (arXiv:2410.04253), and Bansal et al. 2021 (arXiv:2006.14779).
+
 ## [1.2.0] — 2026-06-30
 
 Makes a study-swarm dispatch **byte-replayable**. The design was grounded by running study-swarm on this feature itself — five load-bearing questions (replay-manifest structure, cross-platform canonicalization, step-level provenance, LLM replay-determinism reality, tool-schema drift) dispatched to parallel retrieval-grounded agents; all 39 findings were gated through Step 4 (`roleos verify-citations` → prism, a different model family, reasoning-stripped) with a public-key-verified Ed25519 receipt before any informed the design.

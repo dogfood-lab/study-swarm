@@ -78,6 +78,9 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm lint [--json] <path…>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | Pin a dispatch for replay — write `<dispatch>.lock.json` content-addressing, per Step-2 agent, the **resolved model id** + the **SHA-256 of the byte-exact prompt** + the **SHA-256 of the tool schema**, plus the Step-4 **verifier receipt**, rolled into one `lock_sha256`. |
 | `study-swarm lock --verify <dispatch> [--from …]` | Re-derive those hashes and assert they match the lock; any drift exits `1`, so it gates CI like a package lockfile. Without `--from`, checks the lock's own integrity. |
+| `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **Canon-rollback compensator.** Flag every dispatch in the corpus whose *Research grounding* cites `<id>` as `evidence-withdrawn` (a tombstone sidecar `<slug>.withdrawn.json` — flag, never delete) and emit a content-addressed withdrawal receipt. `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`. |
+| `study-swarm requalify --check <corpus-dir>` | Fail closed (exit `1`) for any dispatch carrying an unresolved `evidence-withdrawn` flag — the andon that **halts** a withdrawn finding's dependents until it is removed or re-grounded. Gates CI. |
+| `study-swarm requalify --resolve <dispatch> <id> --mode removed\|regrounded [--note …]` | Clear a flag once the finding is removed (the citation is gone) or re-grounded (re-verified clean by the sibling runner; `--note` records the attestation). Idempotent; appends to the sidecar's audit trail. |
 
 `lint` is deterministic — zero model calls — so it's safe in CI. It enforces **Step 3's sourcing standard** locally; the model-based **Step 4** verification still defers to [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
@@ -90,7 +93,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-Three complete, lint-clean worked dispatches ship as references: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (the protocol's central decision, compact), [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (the full v1.1 design pass — 27 citations, every one externally verified), and [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) (the v1.2 lock design — 39 citations, gated through the runner, and the first dispatch to ship its own lock).
+Four complete, lint-clean worked dispatches ship as references: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (the protocol's central decision, compact), [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (the full v1.1 design pass — 27 citations, every one externally verified), [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) (the v1.2 lock design — 39 citations, gated through the runner, and the first dispatch to ship its own lock), and [`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md) (the v1.3 canon-rollback design — 27 citations across revocation, retraction, sagas, and build-invalidation, and the first dispatch to be withdrawn-then-requalified).
 
 ### Gate it in CI
 
@@ -122,6 +125,20 @@ A grounded, verified dispatch is only auditable if you can say *what produced it
 
 **It pins inputs, not outputs.** Pinning model + prompt + temperature does *not* make an LLM's output bit-identical — batch-invariance, floating-point non-associativity, mixture-of-experts routing, and silent provider drift are all outside an offline tool's control. So the lock gives you **replayable inputs and drift-detectable outputs**, never "deterministic replay." The design is grounded, citation by citation, in [`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) — the first dispatch to ship its own lock ([`examples/study-swarm-lock.lock.json`](examples/study-swarm-lock.lock.json)).
 
+### Roll back a withdrawn finding (`withdraw` / `requalify`)
+
+A verified finding becomes **canon** — it informs a downstream decision. So what happens when it's later **withdrawn** (a citation turns out fabricated/misattributed on a re-run, a cited paper is retracted, or the gate flips it)? A `git revert` is not enough, because the finding already propagated. The canon-rollback compensator makes the cleanup executable:
+
+```bash
+study-swarm withdraw arXiv:2402.15089 --reason misattributed --from dispatches/ --receipt rollback.json
+#   → flags every dispatch citing it `evidence-withdrawn` (a tombstone sidecar — flag, never delete)
+#     and writes a content-addressed withdrawal receipt naming every dependent.
+study-swarm requalify --check dispatches/          # exit 1 while any flag is unresolved — the andon HALT
+study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   # or: --mode regrounded --note "<attestation>"
+```
+
+`requalify --check` **fails closed** until each flagged finding is removed or **re-grounded** (re-verified clean by the sibling runner — the CLI records the attestation, it does not itself re-verify). The withdrawal is surfaced **contrastively**, never as a silent drop. Everything — the tombstone and the receipt — is content-addressed and drift-detectable, and operates on the *evidence* layer only: `lock --verify` is untouched by a withdraw. The design is grounded in [`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md), and the [PROTOCOL.md](PROTOCOL.md) §"Compensating a withdrawn finding" is the executable shape. This is the **NAMED_COMPENSATORS** standard made executable: a named, idempotent undo that leaves a known post-state and a receipt.
+
 ## Why it works, in one breath
 
 **Current** — the field moves fast; demanding specific studies-with-years keeps designs from shipping 18 months behind. **Functional** — evidence shows what *fails*, not just what works (explanations can increase over-reliance on *wrong* AI — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Safe** — the verifier-protected envelope is the architecture the evidence supports, and the protocol enforces it on its own output. Sourcing isn't academic theater; it's the evidence trail.
@@ -132,7 +149,7 @@ A grounded, verified dispatch is only auditable if you can say *what produced it
 
 ## Status
 
-A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). **v1.1** sharpens the verifier where the first release was silent: decomposed/ternary groundedness, generation-time grounding, an oracle-gated cascade for combining lenses, and calibrated abstention — each grounded in the verified v1.1 dispatch. **v1.2** makes a dispatch byte-replayable: `study-swarm lock` pins the resolved model, prompt, and tool schema per step plus the verifier receipt, and `lock --verify` fails closed on drift. This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
+A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). **v1.1** sharpens the verifier where the first release was silent: decomposed/ternary groundedness, generation-time grounding, an oracle-gated cascade for combining lenses, and calibrated abstention — each grounded in the verified v1.1 dispatch. **v1.2** makes a dispatch byte-replayable: `study-swarm lock` pins the resolved model, prompt, and tool schema per step plus the verifier receipt, and `lock --verify` fails closed on drift. **v1.3** makes the rollback executable: when a finding that already became canon is withdrawn, `study-swarm withdraw` flags every dependent and `requalify --check` halts them fail-closed until they're removed or re-grounded — a named, receipted, idempotent compensator. This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
 
 MIT licensed.
 
