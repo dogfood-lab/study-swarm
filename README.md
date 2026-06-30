@@ -52,6 +52,10 @@ Neither family caught both traps alone — but their **union caught 2/2**. A sin
 
 That single run is the thesis in miniature: **decorrelated lenses + a retrieval oracle for existence beat any one smart judge.**
 
+### …and again, to design v1.1
+
+The v1.1 refinements were chosen the same way — by running study-swarm **on study-swarm**. Four questions the first release left to "I think" (how to *mechanize* the groundedness check, whether to ground at generation time, how to *combine* the lenses, whether to abstain on calibrated uncertainty) went to parallel research agents, and all **27 resulting citations** were gated through Step 4 before any informed the design. The retrieval oracle confirmed **27/27 exist** — including six 2025–2026 papers a parametric model would have false-flagged as fabricated — and corrected five attributions a model could not, among them a real first-author misattribution the research agent flagged on itself. Run reasoning-stripped, the groundedness lenses even reproduced their own documented failure modes on our dispatch: one confidently mislabelled a real paper, and their *disagreement* triggered escalation — exactly as the cascade prescribes. The worked dispatch ships as [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md); the refinements it grounded — decomposed/ternary groundedness, generation-time grounding, the oracle-gated cascade, and calibrated abstention — are in [PROTOCOL.md](PROTOCOL.md).
+
 ## How it's wired
 
 You can run the protocol by hand — any different-family model plus resolving the arXiv/DOI yourself satisfies Step 4. Two sibling tools make it one command:
@@ -84,7 +88,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-A complete, lint-clean dispatch — study-swarm applied to its own design — ships in [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) as a worked reference.
+Two complete, lint-clean worked dispatches ship as references: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (the protocol's central decision, compact) and [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (the full v1.1 design pass — 27 citations, every one externally verified).
 
 ### Gate it in CI
 
@@ -120,7 +124,7 @@ jobs:
 
 ## Status
 
-A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
+A working protocol, externally verified by its own machinery — a different model family checks its citations (see the proof above). **v1.1** sharpens the verifier where the first release was silent: decomposed/ternary groundedness, generation-time grounding, an oracle-gated cascade for combining lenses, and calibrated abstention — each grounded in the verified v1.1 dispatch. This repo is the public reference; [PROTOCOL.md](PROTOCOL.md) is the executable shape. Part of the [dogfood-lab](https://github.com/dogfood-lab) family — methods and showcases for building in the AI era.
 
 MIT licensed.
 

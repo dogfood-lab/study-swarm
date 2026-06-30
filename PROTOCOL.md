@@ -1,6 +1,6 @@
 # The study-swarm protocol — locked execution shape
 
-This is the executable reference. The narrative, the proof, and the research grounding are in [README.md](README.md).
+This is the executable reference. The narrative, the proof, and the research grounding are in [README.md](README.md). The **v1.1** refinements — decomposed groundedness, the oracle-gated cascade, generation-time grounding, and calibrated abstention — are grounded in [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md), the protocol run on itself with every citation verified by a different model family.
 
 > **The one-line guard:** no finding reaches Step 5 unverified. If you cannot verify — verifier down, no different family reachable, retrieval oracle unreachable — you HALT and escalate; you do not proceed. The protocol never lets a model grade its own homework, including the one running it.
 
@@ -43,6 +43,8 @@ One agent per question, dispatched **in parallel** (a single batch). Each agent'
 
 Typical agent count: 3–5.
 
+**Ground at generation time, not only at the gate.** An agent operates in a retrieve-then-cite loop — search, fetch, and cite **only sources it actually pulled this session**; a claim it cannot ground in a fetched source is **dropped, not invented**. Forcing retrieval *during* generation cuts off-source fabrication at the source instead of leaving all of it to be caught (and *dropped*) downstream — an inline retrieve-and-critique loop reduces ungrounded output by roughly an order of magnitude (Asai et al. 2023, arXiv:2310.11511; the browse-then-cite contract that made WebGPT answers checkable, Nakano et al. 2021, arXiv:2112.09332). This buys precision at the cost of coverage (Saxena et al. 2025, arXiv:2509.21557), so pair it with a **coverage-recovery pass** — a second sweep for true-but-hard-to-retrieve findings — and never drop the deterministic existence oracle, since citation-heavy agents can still emit plausible non-existent identifiers (Rao et al. 2026, arXiv:2604.03173).
+
 > Step 4 makes retrieval a **hard** requirement: a paper an agent "remembers" but cannot retrieve does not enter the dispatch. Existence is established by resolving the identifier, not by recall.
 
 ## Step 3 — Synthesize into a "Research grounding" section
@@ -68,7 +70,7 @@ Before any finding informs the design (Step 5), a verifier of a **different mode
 ### Two-stage check, per citation
 
 1. **Existence / attribution — a retrieval oracle, not a parametric LLM.** Resolve the arXiv ID / DOI / URL and confirm the paper exists with the stated title, authors, and year. This stage **must retrieve** (fetch the source / arXiv / Crossref), never model memory — fabrication and misattribution rates are high enough (Walters & Wilder 2023) and 2025–2026 papers postdate model training, so a parametric check will false-flag real work as fabricated (Onweller et al. 2026). If retrieval is unavailable, apply the halt-and-escalate rule below.
-2. **Groundedness — finding matches source.** Confirm the one-sentence finding describes what the source actually claims (an NLI-style support check). Even strong models fail to fully support their own citations roughly half the time, so this is a distinct, necessary axis — not implied by existence.
+2. **Groundedness — finding matches source (decomposed, ternary).** Confirm the one-sentence finding describes what the source actually claims. Do **not** judge the sentence whole — a real paper with a resolvable link can still be *overstated* by a finding, and a whole-sentence check cannot localize that (Min et al. 2023, arXiv:2305.14251). Decompose the finding into **molecular claims** — decontextualized + minimal, just enough context to disambiguate, no more (Gunjal & Durrett 2024, arXiv:2406.20079) — **filter to the load-bearing, non-trivial claim** so padding earns no credit (Jiang et al. 2024, arXiv:2407.03572), check each against the source, and return a **ternary** verdict: fully / partially / not supported (Gao et al. 2023, arXiv:2305.14627). A **partially-supported** finding (the link resolves, the paper is real, the sentence overstates it) is treated like a misattribution — corrected once or escalated — never auto-passed. Pin the decomposer per run, because the verdict is sensitive to the decomposition method (Wanner et al. 2024, arXiv:2403.11903). Even strong models fully support their own citations only ~half the time, so this axis is distinct from existence and necessary.
 
 ### Running it
 
@@ -76,15 +78,20 @@ The reference implementation is **`roleos verify-citations <dispatch>`** ([role-
 
 **Ensemble — ≥ 3 decorrelated lenses,** counting the **retrieval oracle as one mechanism-diverse lens**: retrieval oracle + ≥ 2 different-family LLM lenses. Diversity of lenses, not raw count, is the load-bearing variable (Rajan 2025; Kim et al. 2025).
 
+**Aggregate as a cascade, not a flat vote.** Adding LLM lenses cannot rescue a correlated blind spot — a 9-judge panel across 7 families is worth only ~2 independent votes, because the models miss the same items (Kohli 2026, arXiv:2605.29800), and recent papers that postdate training are exactly such a shared blind spot. So **existence is gated by the deterministic oracle alone** — the one genuinely decorrelated lens — and the LLM lenses vote **only on groundedness**. For that vote, use a **tuned minority-veto** (an invalid verdict needs more than one corroborating flag): it beats both raw disjunction (which over-rejects genuine work) and majority (which misses a single-lens catch) while bounding over-rejection, and a small labeled calibration set beats adding lenses (Jain et al. 2025, arXiv:2510.11822). When the oracle confirms existence but the groundedness lenses **disagree** — especially on a post-cutoff paper — that disagreement is the signal to **escalate to a human, not auto-reject** (Kolawole et al. 2024, arXiv:2407.02348), and a confident "fabricated" flag from an LLM lens is down-weighted relative to the oracle (LLM judges are systematically overconfident — Tian et al. 2025, arXiv:2508.06225).
+
 ### Halt conditions (scope is per-finding — other verified findings proceed)
 
 | Verdict / condition | Action |
 |---|---|
 | **FABRICATED** | The finding is **dropped** — there is no real source to correct, so re-verification is not attempted. |
 | **MISATTRIBUTED** | Correct the attribution and re-verify **once**; a second non-clean verdict drops the finding. |
+| **PARTIALLY_SUPPORTED** | A molecular claim is unsupported or overstated though the paper is real. Treated like a misattribution: correct the finding to what the source actually supports and re-verify **once**, or escalate — never auto-passed. |
 | **CANNOT_CONFIRM** | The finding is **removed from the design connection AND surfaced to a human with a contrastive frame** — "you probably expected finding N citable; I left it out because the oracle couldn't confirm it — override with X." Never silently kept; reinstated only if a human confirms the source. |
 | **Verifier or oracle UNAVAILABLE** | The dispatch **HALTS and escalates to a human.** Unavailability is NEVER read as "citations are fine" and NEVER read as fabrication. Proceeding without a completed verification is forbidden. |
 | **No different family reachable** | The retrieval oracle (Stage 1) still runs — it is mechanism-diverse and needs no different family — and gates existence. The groundedness LLM lens (Stage 2) **halts-and-escalates** rather than running same-family. A same-family LLM is never substituted for the different-family check. |
+
+**Abstention is calibrated and evidence-gated.** `CANNOT_CONFIRM` is a **first-class verdict the verifier is instructed to produce** — not a binary accept/reject collapsed under a confidence cut; a model trained or prompted to say "I don't know" is better calibrated than post-hoc thresholding (Zhang et al. 2023, arXiv:2311.09677). Trigger abstention on **external evidence absence** — the source wasn't fetched, or the retrieved text doesn't contain the claim — **never** on the verifier's own entropy or verbalized confidence, which can be confidently wrong (Phillips et al. 2026, arXiv:2603.21172). Where you tune a threshold, tune it with conformal calibration so the *accepted* set carries a provable error bound (Wang et al. 2024, arXiv:2407.00499). Surface a `CANNOT_CONFIRM` **contrastively and selectively** — "I expected to find X and didn't" — never as an always-on confidence bar, which measurably worsens over-reliance (Srinivasan & Thomason 2025, arXiv:2502.13321). Finally, **cap the abstain/escalation rate** against a labeled holdout and treat a spike as its own halt — over-refusal is itself a failure mode (Zhu et al. 2025, arXiv:2502.05911).
 
 ## Step 5 — Connect findings to architecture, not just cite them
 

@@ -13,53 +13,57 @@
   <img src="https://img.shields.io/badge/cited%20research-verified-1f6feb" alt="Cited research, verified">
 </p>
 
-**Baseie as decisões de design em pesquisa citada — e depois verifique as citações com uma família de modelos *diferente* antes que qualquer parte disso se torne canônica.**
+**Baseie as decisões de projeto em pesquisas citadas — e, em seguida, verifique as citações com um *modelo diferente* antes que qualquer coisa se torne parte do cânone.**
 
-`study-swarm` é um protocolo, não uma ferramenta. Quando você está tomando uma decisão de design substancial com um LLM — uma nova camada de produto, uma escolha de arquitetura, uma decisão de "devemos confiar no modelo aqui" — improvisar a partir de primeiros princípios entrega designs que estão desatualizados, e citar artigos de memória entrega designs que se baseiam em fontes que não existem ou não dizem o que você pensa. study-swarm substitui ambos: despache agentes de pesquisa paralelos, exija descobertas citadas específicas e submeta cada citação a um **verificador externo de uma família de modelos diferente** antes que ela informe o design.
+`study-swarm` é um protocolo, não uma ferramenta. Ao tomar uma decisão de projeto importante com um LLM — uma nova camada de produto, uma escolha arquitetural, uma decisão sobre "se devemos confiar no modelo aqui" — improvisar a partir de princípios básicos resulta em projetos desatualizados e citar artigos de memória leva a projetos baseados em fontes que não existem ou que não dizem o que você pensa. O `study-swarm` substitui ambos: ele envia agentes de pesquisa paralelos, exige descobertas específicas citadas e valida cada citação por meio de um **verificador externo de uma família de modelos diferente** antes que ela influencie o projeto.
 
-Ele aplica seu próprio remédio. O protocolo prescreve envelopes protegidos por verificador para os sistemas que ajuda a projetar — então ele executa um em si mesmo. **Nenhum modelo corrige sua própria tarefa, incluindo aquele que executa o protocolo.**
+Ele aplica sua própria abordagem. O protocolo prescreve "envelopes" protegidos por verificadores para os sistemas que ele ajuda a projetar — portanto, ele executa um deles em si mesmo. **Nenhum modelo avalia seu próprio trabalho, incluindo o que está executando o protocolo.**
 
-## O protocolo em cinco passos
+## O protocolo em cinco etapas:
 
-1. **Identifique** 3–5 questões de design cruciais onde evidências empíricas mudariam a resposta.
-2. **Despache** um agente de pesquisa por questão, em paralelo. Cada um deve retornar títulos de artigos + autores + anos + URLs + uma descoberta em uma frase — especificidade em vez de amplitude ("6–8 descobertas bem fundamentadas valem mais que 20 gestos vagos").
-3. **Sintetize** as descobertas em uma seção de *Base de pesquisa*: `N. **<descoberta>.** <Autores> <ano> (<arXiv/DOI>). <implicação de design>.`
-4. **Verifique externamente** — uma *família de modelos diferente*, sem raciocínio, verifica cada citação em duas etapas: um **oráculo de recuperação** confirma que o artigo existe (nunca a memória do modelo), e então uma **lente de fundamentação** confirma que a descoberta corresponde à fonte. **Pare** em caso de fabricação/má atribuição; **pare e escale** se o verificador ou o oráculo de recuperação estiver indisponível (nunca interprete a ausência como "citações estão ok").
-5. **Conecte** cada escolha arquitetônica a uma descoberta pelo número. Citações sem uma implicação de design são ruído.
+1. **Identifique** 3 a 5 questões de projeto cruciais, nas quais evidências empíricas mudariam a resposta.
+2. **Envie** um agente de pesquisa por questão, em paralelo. Cada um deve retornar títulos de artigos + autores + anos + URLs + uma descoberta em uma frase — especificidade em vez de amplitude ("6 a 8 descobertas bem fundamentadas superam 20 observações vagas").
+3. **Sintetize** as descobertas em uma seção de *fundamentação da pesquisa*: `N. **<descoberta>.** <Autores> <ano> (<arXiv/DOI>). <implicação para o projeto>.`
+4. **Verifique externamente** — uma *família de modelos diferente*, sem raciocínio, verifica cada citação em duas etapas: um **oráculo de recuperação** confirma que o artigo existe (nunca a memória do modelo) e, em seguida, uma lente de **validação** confirma que a descoberta corresponde à fonte. **Interrompa** se for fabricada/atribuída incorretamente; **interrompa e alerte** se o verificador ou o oráculo de recuperação não estiverem disponíveis (nunca interprete a ausência como "citações válidas").
+5. **Conecte** cada escolha arquitetural a uma descoberta por meio de um número. Citações sem implicação para o projeto são ruído.
 
-O detalhe executável completo — a tabela de paradas, o padrão de fontes, a regra de conjunto — está em **[PROTOCOL.md](PROTOCOL.md)**.
+Os detalhes completos e executáveis — a tabela de interrupção, o padrão de referência e a regra do conjunto — estão em **[PROTOCOL.md](PROTOCOL.md)**.
 
-## Por que uma família *diferente*, sem raciocínio?
+## Por que uma *família diferente*, sem raciocínio?
 
 Porque os modos de falha são documentados, não hipotéticos:
 
-- **Os LLMs não conseguem verificar de forma confiável suas próprias saídas.** Huang et al. 2023 ([arXiv:2310.01798](https://arxiv.org/abs/2310.01798)); Kambhampati et al. 2024 ([arXiv:2402.01817](https://arxiv.org/abs/2402.01817), LLM-Modulo); Stechly et al. 2024 ([arXiv:2402.08115](https://arxiv.org/abs/2402.08115)) — o verificador externo é responsável pelos ganhos; o conteúdo de autocrítica é inerte.
-- **Juízes da mesma família preferem a si mesmos.** Panickssery, Bowman & Feng 2024 ([arXiv:2404.13076](https://arxiv.org/abs/2404.13076)) — o autorreconhecimento correlaciona-se *linearmente* com a autopreferência, portanto, o cegamento parcial não ajuda. Verga et al. 2024 ([arXiv:2404.18796](https://arxiv.org/abs/2404.18796), PoLL) — um painel entre famílias distintas é menos tendencioso a um custo ~7× menor.
-- **Citações são onde os LLMs mentem.** Walters & Wilder 2023 ([doi:10.1038/s41598-023-41032-5](https://doi.org/10.1038/s41598-023-41032-5)) — 55% das citações do GPT-3.5 / 18% das citações do GPT-4 são fabricadas. Onweller et al. 2026 ([arXiv:2605.06635](https://arxiv.org/abs/2605.06635)) — os links resolvem >94% das vezes, mas apenas 39–77% do conteúdo citado realmente apoia a afirmação. Portanto, a existência deve ser verificada por **recuperação, não por recordação**.
-- **Oculte o raciocínio do gerador.** Khalifa et al. 2026 ([arXiv:2601.14691](https://arxiv.org/abs/2601.14691), "Gaming the Judge") — o raciocínio em cadeia (chain-of-thought) manipulado por si só infla os falsos positivos de um juiz em até 90% com as ações mantidas fixas. Turpin et al. 2023 ([arXiv:2305.04388](https://arxiv.org/abs/2305.04388)) — CoT é uma racionalização a posteriori. O verificador vê a afirmação da citação em si, nunca o 'por que incluí isto'.
-- **Diversidade supera quantidade.** Rajan 2025 ([arXiv:2511.16708](https://arxiv.org/abs/2511.16708)) — quatro verificadores com correlação par a par ρ ∈ [0.05, 0.25] superam qualquer um individualmente através de cobertura submodular. Kim et al. 2025 ([arXiv:2506.07962](https://arxiv.org/abs/2506.07962)) — os erros dos LLMs são *correlacionados*, portanto, a variável crucial é a diversidade das lentes, não a quantidade bruta.
+- **Os LLMs não conseguem verificar de forma confiável sua própria saída.** Huang et al. 2023 ([arXiv:2310.01798](https://arxiv.org/abs/2310.01798)); Kambhampati et al. 2024 ([arXiv:2402.01817](https://arxiv.org/abs/2402.01817), LLM-Modulo); Stechly et al. 2024 ([arXiv:2402.08115](https://arxiv.org/abs/2402.08115)) — o verificador externo traz os benefícios; o conteúdo de autocrítica é inerte.
+- **Juízes da mesma família se auto favorecem.** Panickssery, Bowman & Feng 2024 ([arXiv:2404.13076](https://arxiv.org/abs/2404.13076)) — o autorreconhecimento está correlacionado *linearmente* com a autopreferência, portanto, o bloqueio parcial não ajuda. Verga et al. 2024 ([arXiv:2404.18796](https://arxiv.org/abs/2404.18796), PoLL) — um painel de famílias distintas é menos tendencioso, com um custo cerca de 7 vezes menor.
+- **As citações são onde os LLMs mentem.** Walters & Wilder 2023 ([doi:10.1038/s41598-023-41032-5](https://doi.org/10.1038/s41598-023-41032-5)) — 55% das citações do GPT-3.5 / 18% do GPT-4 são fabricadas. Onweller et al. 2026 ([arXiv:2605.06635](https://arxiv.org/abs/2605.06635)) — os links resolvem >94% das vezes, mas apenas 39–77% do conteúdo citado realmente sustentam a afirmação. Portanto, a existência deve ser verificada por meio de **recuperação, não de recordação**.
+- **Oculte o raciocínio do gerador.** Khalifa et al. 2026 ([arXiv:2601.14691](https://arxiv.org/abs/2601.14691), "Gaming the Judge") — a manipulação da cadeia de pensamento sozinha aumenta os falsos positivos de um juiz em até 90%, com as ações mantidas fixas. Turpin et al. 2023 ([arXiv:2305.04388](https://arxiv.org/abs/2305.04388)) — a cadeia de pensamento é uma racionalização *a posteriori*. O verificador vê apenas a afirmação da citação, nunca o "por que eu incluí isso".
+- **A diversidade supera a quantidade.** Rajan 2025 ([arXiv:2511.16708](https://arxiv.org/abs/2511.16708)) — quatro verificadores com correlação de pares ρ ∈ [0,05, 0,25] superam qualquer um deles por meio da cobertura submodular. Kim et al. 2025 ([arXiv:2506.07962](https://arxiv.org/abs/2506.07962)) — os erros do LLM são *correlacionados*, portanto, a variável crucial é a diversidade das lentes, não a quantidade bruta.
 
-## Funciona de verdade? (prova)
+## Ele realmente funciona? (prova)
 
-Como teste, o protocolo foi executado contra suas próprias citações. Duas famílias não Claude e decorrelacionadas — **Mistral** (`mistral-small:24b`) e **IBM Granite** (`granite4.1:30b`) — verificaram um conjunto de citações, sem o raciocínio, plantadas com duas armadilhas cegas:
+Como teste, o protocolo foi executado em suas próprias citações. Duas famílias decorrelacionadas e diferentes do Claude — **Mistral** (`mistral-small:24b`) e **IBM Granite** (`granite4.1:30b`) — verificaram um conjunto de citações, sem raciocínio, com duas armadilhas ocultas:
 
-| Armadilha plantada | Mistral | IBM Granite | Verdade fundamental |
+| Armadilha plantada | Mistral | IBM Granite | Verdade factual |
 |---|---|---|---|
-| Prompt de raciocínio em cadeia atribuído a "Nakamura & Olsen" | perdida | **apanhada** (atribuída incorretamente → na verdade Wei et al. 2022, arXiv:2201.11903) | atribuída incorretamente |
-| um artigo fabricado "98% dos erros removidos, sem necessidade de oráculo" | **caught** (fabricated) | **caught** (fabricated) | fabricado |
+| O raciocínio da cadeia de pensamento foi atribuído a "Nakamura & Olsen" | não detectada | **detectada** (atribuição incorreta → na verdade, Wei et al. 2022, arXiv:2201.11903) | atribuída incorretamente |
+| um artigo fabricado com a afirmação de que "98% dos erros foram removidos, nenhum oráculo é necessário" | **caught** (fabricated) | **caught** (fabricated) | fabricado |
 
-Nenhuma das famílias apanhou ambas as armadilhas sozinha — mas a sua **união apanhou 2/2**. Um único juiz teria deixado passar a atribuição incorreta. Separadamente, o oráculo de recuperação apanhou duas atribuições incorretas *reais* nos nossos próprios documentos de projeto (artigos citados com o primeiro autor incorreto) que nenhum LLM paramétrico poderia ter sinalizado — e confirmou corretamente artigos genuínos de 2026 que ambos os LLMs sinalizaram falsamente como fabricados simplesmente porque os artigos são posteriores ao seu treinamento. Esse último ponto é a razão pela qual a verificação de existência da Etapa 4 **deve** ser um oráculo de recuperação, nunca um LLM.
+Nenhuma das famílias detectou as duas armadilhas sozinha — mas sua **união detectou 2/2**. Um único juiz teria aceitado a atribuição incorreta. Separadamente, o oráculo de recuperação detectou duas *atribuições incorretas reais* em nossos próprios documentos de projeto (artigos citados sob o autor principal errado) que nenhum LLM paramétrico poderia ter sinalizado — e ele confirmou corretamente artigos genuínos de 2026 que ambos os LLMs marcaram falsamente como fabricados, simplesmente porque os artigos são posteriores ao seu treinamento. Esse último ponto é a razão pela qual a verificação da existência na etapa 4 **deve** ser um oráculo de recuperação, nunca um LLM.
 
-Essa única execução é a tese em miniatura: **lentes decorrelacionadas + um oráculo de recuperação para existência superam qualquer juiz inteligente.**
+Essa única execução é a tese em miniatura: **lentes decorrelacionadas + um oráculo de recuperação para a existência superam qualquer juiz inteligente.**
+
+### …e novamente, para projetar a v1.1
+
+As melhorias da versão 1.1 foram escolhidas da mesma forma – executando o `study-swarm` no próprio `study-swarm`. Quatro questões que a primeira versão deixou em aberto (“Acho que…” – como *mecanizar* a verificação da fundamentação, se a fundamentação deve ser feita no momento da geração, como *combinar* as lentes, se deve abster-se na incerteza calibrada) foram encaminhadas para agentes de pesquisa paralelos, e todas as **27 citações resultantes** foram validadas na Etapa 4 antes que qualquer uma delas influenciasse o projeto. O oráculo de recuperação confirmou que **27/27 existem** – incluindo seis artigos de 2025–2026 que um modelo paramétrico teria classificado erroneamente como fabricados – e corrigiu cinco atribuições que um modelo não conseguiria, entre elas uma real má atribuição do primeiro autor que o agente de pesquisa identificou em si mesmo. Executando sem raciocínio, as lentes de fundamentação até reproduziram seus próprios modos de falha documentados em nossa análise: uma delas rotulou incorretamente um artigo real com confiança, e sua *discordância* desencadeou a escalada – exatamente como o processo estabelece. A análise completa está disponível em [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md); as melhorias que foram implementadas – fundamentação decomposta/ternária, fundamentação no momento da geração, a cascata validada pelo oráculo e a abstinência calibrada – estão em [PROTOCOL.md](PROTOCOL.md).
 
 ## Como funciona
 
-Pode executar o protocolo manualmente — qualquer modelo de família diferente, além de resolver o arXiv/DOI você mesmo, satisfaz a Etapa 4. Duas ferramentas irmãs tornam isso um único comando:
+Você pode executar o protocolo manualmente – qualquer modelo de família diferente mais a resolução do arXiv/DOI por conta própria satisfaz a Etapa 4. Duas ferramentas complementares tornam isso um único comando:
 
-- **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** — o verificador em tempo de execução: roteamento diferenciado por família, sem raciocínio, adjudicação multilente, um piso determinístico de existência de recuperação (arXiv → Crossref) e recibos assinados.
-- **[role-os](https://github.com/mcp-tool-shop-org/role-os)** — fornece `roleos verify-citations <dispatch>`, o executor que extrai as citações de um despacho e as encaminha através do prism.
+- **[prism-verify](https://github.com/mcp-tool-shop-org/prism-verify)** – o verificador em tempo de execução: roteamento entre famílias diferentes, sem raciocínio, adjudicação multi-lente, um limite determinístico para a existência da recuperação (arXiv → Crossref) e recibos assinados.
+- **[role-os](https://github.com/mcp-tool-shop-org/role-os)** – fornece `roleos verify-citations <dispatch>`, o executor que extrai as citações de uma análise e as valida por meio do prism.
 
-A transferência é o próprio formato do despacho: uma descoberta escrita como `N. **descoberta.** Autores ano (arXiv|DOI). implicação.` — com **um identificador resolvível por descoberta** — é exatamente o que `roleos verify-citations` extrai e encaminha. Um despacho limpo pelo `lint` é transferido sem problemas; uma citação malformada é o que o executor sinaliza como não analisada. Esse contrato é o que `study-swarm lint` verifica localmente, para que o Passo 3 e o Passo 4 concordem sobre o que é uma citação.
+A transferência é o próprio formato da análise: um achado escrito como `N. **achado.** Autores ano (arXiv|DOI). implicação.` – com **um identificador resolvível por achado** – é exatamente o que `roleos verify-citations` extrai e valida. Uma análise “limpa” passa facilmente; uma citação malformada é o que o executor sinaliza como não analisada. Esse contrato é o que `study-swarm lint` verifica localmente, para que as Etapas 3 e 4 concordem sobre o que é uma citação.
 
 ## CLI
 
@@ -67,13 +71,13 @@ A transferência é o próprio formato do despacho: uma descoberta escrita como 
 npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-swarm <command>
 ```
 
-| Comando | O que faz |
+| Comando | O que ele faz |
 |---|---|
-| `study-swarm protocol` | Imprime o protocolo completo — os cinco passos, a tabela de parada, o padrão de fontes. |
-| `study-swarm new <slug>` | Gera o esqueleto de um `<slug>.dispatch.md` com a estrutura de cinco passos para preencher. |
-| `study-swarm lint [--json] <path…>` | Verifica a *Base de pesquisa* de um despacho em relação ao padrão de fontes — cada descoberta precisa de um autor, um ano e um identificador resolvível (arXiv / DOI / URL); o discurso vago de "estudos mostram..." é rejeitado. Sai com `1` em caso de violações, para que bloqueie a CI. Um `<path>` pode ser um arquivo, um diretório (verificado recursivamente para `*.dispatch.md`), ou `-` para stdin; `--json` emite um relatório legível por máquina. |
+| `study-swarm protocol` | Imprime o protocolo completo – as cinco etapas, a tabela de interrupção e o padrão de referência. |
+| `study-swarm new <slug>` | Cria um arquivo `<slug>.dispatch.md` com o esqueleto das cinco etapas para preencher. |
+| `study-swarm lint [--json] <path…>` | Verifica a *fundamentação da pesquisa* de uma análise em relação ao padrão de referência – cada achado precisa de um autor, um ano e um identificador resolvível (arXiv / DOI / URL); “estudos mostram…” sem embasamento é rejeitado. Sai com `1` em caso de violações, para que valide o CI. Um `<path>` pode ser um arquivo, um diretório (analisado recursivamente para `*.dispatch.md`) ou `-` para stdin; `--json` emite um relatório legível por máquina. |
 
-`lint` é determinístico — zero chamadas ao modelo — portanto, é seguro na CI. Ele impõe o **padrão de fontes do Passo 3** localmente; a verificação baseada em modelo do **Passo 4** ainda depende de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
+`lint` é determinístico – sem chamadas de modelo – portanto, é seguro no CI. Ele aplica o **padrão de referência da Etapa 3** localmente; a verificação baseada em modelo da **Etapa 4** ainda depende de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
 Um ciclo típico:
 
@@ -84,11 +88,11 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-Um despacho completo e limpo pelo `lint` — study-swarm aplicado ao seu próprio design — está disponível em [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) como uma referência prática.
+Duas análises completas e “limpas” são fornecidas como referência: [`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md) (a decisão central do protocolo, concisa) e [`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md) (o projeto completo da v1.1 – 27 citações, todas validadas externamente).
 
-### Bloqueie na CI
+### Valide no CI
 
-`lint` aceita um arquivo, um diretório (verificado recursivamente para `*.dispatch.md`), ou `-` para stdin, e `--json` emite um relatório legível por máquina. Adicione isto ao seu repositório para bloquear as fontes de cada despacho em cada PR (um exemplo para copiar e colar também está em [`examples/study-swarm-ci.yml`](examples/study-swarm-ci.yml)):
+`lint` recebe um arquivo, um diretório (analisado recursivamente para `*.dispatch.md`) ou `-` para stdin, e `--json` emite um relatório legível por máquina. Adicione isso ao seu repositório para validar a referência de cada análise em cada PR (uma amostra de cópia e colagem também está em [`examples/study-swarm-ci.yml`](examples/study-swarm-ci.yml)):
 
 ```yaml
 # .github/workflows/dispatches.yml
@@ -110,19 +114,19 @@ jobs:
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
 ```
 
-## Por que funciona, em uma só frase
+## Por que funciona, em poucas palavras
 
-**Atual** — o campo avança rapidamente; exigir estudos específicos com anos impede que os designs fiquem 18 meses atrasados. **Funcional** — as evidências mostram o que *falha*, não apenas o que funciona (explicações podem aumentar a confiança excessiva em IA *errada* — Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Seguro** — o envelope protegido pelo verificador é a arquitetura que as evidências suportam, e o protocolo a impõe em sua própria saída. A citação de fontes não é teatro acadêmico; é o rastro de evidências.
+**Atual** – o campo evolui rapidamente; exigir estudos específicos com anos evita que os projetos sejam lançados com 18 meses de atraso. **Funcional** – a evidência mostra o que *falha*, não apenas o que funciona (explicações podem aumentar a dependência excessiva em IA *incorreta* – Bansal et al. 2021, [arXiv:2006.14779](https://arxiv.org/abs/2006.14779)). **Seguro** – o envelope protegido pelo verificador é a arquitetura que a evidência suporta, e o protocolo a aplica em sua própria saída. A referência não é um exercício acadêmico; é o rastro da evidência.
 
 ## Segurança
 
-`study-swarm` é fornecido com uma **CLI leve e sem dependências** (`study-swarm`) juntamente com a metodologia. Ele não faz **nenhuma chamada de rede ou de modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele apenas lê o arquivo que você passa para `lint` e escreve um único `<slug>.dispatch.md` no diretório atual para `new` (recusando sobrescrever e nunca fora do diretório de trabalho). A verificação baseada em modelo que a metodologia descreve (Passo 4) é executada pelas ferramentas irmãs, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
+`study-swarm` fornece uma **CLI fina e com poucas dependências** (`study-swarm`) junto com a metodologia. Ele não faz **chamadas de rede ou modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele lê apenas o arquivo que você passa para `lint` e grava um único arquivo `<slug>.dispatch.md` no diretório atual para `new` (recusando-se a sobrescrever e nunca fora do diretório de trabalho). A verificação baseada em modelo descrita na metodologia (Etapa 4) é executada pelas ferramentas complementares, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
 
 ## Status
 
-Um protocolo funcional, verificado externamente por sua própria maquinaria — uma família de modelos diferente verifica suas citações (veja a prova acima). Este repositório é a referência pública; [PROTOCOL.md](PROTOCOL.md) é a forma executável. Parte da família [dogfood-lab](https://github.com/dogfood-lab) — métodos e vitrines para construir na era da IA.
+Um protocolo funcional, validado externamente por sua própria ferramenta – uma família de modelos diferente verifica suas citações (veja a prova acima). A **v1.1** aprimora o verificador onde a primeira versão estava em silêncio: fundamentação decomposta/ternária, fundamentação no momento da geração, uma cascata validada pelo oráculo para combinar lentes e abstinência calibrada – cada um com base na análise v1.1 validada. Este repositório é a referência pública; [PROTOCOL.md](PROTOCOL.md) é a forma executável. Faz parte da família [dogfood-lab](https://github.com/dogfood-lab) – métodos e exemplos para construir na era da IA.
 
-Licenciado pelo MIT.
+Licenciado sob MIT.
 
 ---
 

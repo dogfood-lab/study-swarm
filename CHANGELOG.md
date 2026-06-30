@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-06-29
+
+The protocol run on itself a second time — to design its own next version. Four load-bearing questions the first release left to "I think" were dispatched to parallel research agents; all 27 resulting citations were gated through Step 4 (retrieval oracle for existence + two different model families for groundedness, reasoning-stripped) before any informed the design. The oracle confirmed 27/27 exist — including six 2025–2026 papers a parametric model would have false-flagged — and corrected five attributions, among them a real first-author misattribution the research agent flagged on itself.
+
+### Changed
+
+- **PROTOCOL.md Step 4 (groundedness) is now decomposed and ternary.** The stage-2 check no longer judges a finding sentence whole — it decomposes the finding into *molecular* claims (decontextualized + minimal), filters to the load-bearing claim so padding earns no credit, checks each against the source, and returns *fully / partially / not supported*. A partially-supported finding (real paper, resolvable link, overstated sentence) is corrected-once or escalated, never auto-passed. Grounded in Min et al. 2023 (arXiv:2305.14251), Gao et al. 2023 (arXiv:2305.14627), Gunjal & Durrett 2024 (arXiv:2406.20079), Jiang et al. 2024 (arXiv:2407.03572), Wanner et al. 2024 (arXiv:2403.11903).
+- **PROTOCOL.md Step 4 specifies an aggregation rule (the cascade).** Where v1.0.0 said only "≥3 decorrelated lenses, diversity > count," v1.1 says *how* to combine them: existence is gated by the deterministic oracle alone (the one genuinely decorrelated lens), the LLM lenses vote only on groundedness via a tuned minority-veto, and lens disagreement on a post-cutoff paper escalates rather than auto-rejects. Grounded in Kohli 2026 (arXiv:2605.29800), Jain et al. 2025 (arXiv:2510.11822), Kolawole et al. 2024 (arXiv:2407.02348), Tian et al. 2025 (arXiv:2508.06225).
+- **PROTOCOL.md Step 2 mandates generation-time grounding** (browse-then-cite, cite only fetched sources, drop-don't-invent) paired with a coverage-recovery pass, since forcing retrieval buys precision at the cost of coverage. Grounded in Asai et al. 2023 (arXiv:2310.11511), Nakano et al. 2021 (arXiv:2112.09332), Saxena et al. 2025 (arXiv:2509.21557), Rao et al. 2026 (arXiv:2604.03173).
+- **PROTOCOL.md halt table: abstention is now calibrated and evidence-gated.** `CANNOT_CONFIRM` stays a first-class verdict (not a binary collapsed under a confidence cut), triggers on external evidence absence rather than the verifier's own entropy, is surfaced contrastively, and the abstain rate is capped as its own halt. Grounded in Zhang et al. 2023 (arXiv:2311.09677), Phillips et al. 2026 (arXiv:2603.21172), Wang et al. 2024 (arXiv:2407.00499), Srinivasan & Thomason 2025 (arXiv:2502.13321), Zhu et al. 2025 (arXiv:2502.05911).
+
+### Added
+
+- Shipped a second worked, lint-clean reference dispatch — `examples/study-swarm-v1_1.dispatch.md` — the full v1.1 design pass with all 27 citations and the external-verification receipt. It is `study-swarm lint`-clean and in the npm tarball.
+
 ## [1.0.0] — 2026-06-13
 
 First stable release. A dogfood-swarm health + feature pass hardened the CLI and verified the methodology against its own gate — all 16 cited papers checked by a retrieval oracle plus a different model family (0 fabricated, 0 misattributed).
@@ -61,6 +76,7 @@ First stable release. A dogfood-swarm health + feature pass hardened the CLI and
 - `SECURITY.md`, MIT `LICENSE`, project logo.
 - Landing page + Starlight handbook at <https://dogfood-lab.github.io/study-swarm/>.
 
+[1.1.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.0.0
 [0.6.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v0.5.0
