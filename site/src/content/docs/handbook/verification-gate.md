@@ -12,7 +12,7 @@ Step 4 is the heart of study-swarm. Before any finding informs the design, a ver
 ## The two-stage check, per citation
 
 1. **Existence / attribution — a retrieval oracle, not a parametric LLM.** Resolve the arXiv ID / DOI / URL and confirm the paper exists with the stated title, authors, and year. This stage **must retrieve** (fetch the source / arXiv / Crossref), never model memory.
-2. **Groundedness — finding matches source.** Confirm the one-sentence finding describes what the source actually claims. Existence is not enough: a real paper can still be cited for something it never said.
+2. **Groundedness — finding matches source (decomposed, ternary).** Confirm the one-sentence finding describes what the source actually claims. Existence is not enough: a real paper can still be cited for something it never said. Decompose the finding into molecular claims and return a **ternary** verdict — fully / partially / not supported — so an overstated-but-real citation is caught, never rounded up to a pass.
 
 ## Why a *different* family, reasoning-stripped
 
@@ -34,6 +34,7 @@ Scope is **per-finding** — other verified findings proceed.
 |---|---|
 | **Fabricated** | The finding is **dropped** — no real source to correct, so no re-verification. |
 | **Misattributed** | Correct the attribution and re-verify **once**; a second non-clean verdict drops it. |
+| **Partially supported** | A molecular claim is unsupported or overstated though the paper is real. Treated like a misattribution — correct the finding to what the source supports and re-verify **once**, or escalate; never auto-passed. |
 | **Cannot confirm** | **Removed from the design AND surfaced to a human** with a contrastive frame — *"you probably expected finding N citable; I left it out because the oracle couldn't confirm it — override with X."* Reinstated only if a human confirms the source. |
 | **Verifier / oracle unavailable** | **Halt and escalate.** Unavailability is never read as "citations are fine," and never as fabrication. Proceeding without a completed verification is forbidden. |
 | **No different family reachable** | The retrieval oracle still runs and gates existence; the groundedness LLM lens **halts and escalates** rather than running same-family. |

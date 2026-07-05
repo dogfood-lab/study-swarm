@@ -1,46 +1,46 @@
 {
-  "schema": "dispatch.lock/v1",
-  "study_swarm_version": "1.3.0",
-  "protocol_sha256": "sha256-8MW4Z/3WF+r/RUnkUc3vSASws29TsLry0OeRb5Phym4=",
-  "dispatch_sha256": "sha256-mPdwnlPuRlCtky20zG6l5AFJ8iRAZjHISnoGDUuGSOo=",
+  "schema": "dispatch.lock/v2",
+  "study_swarm_version": "2.0.0",
+  "protocol_sha256": "sha256-9tVI9RrD1qKHB/j/Ec9+//Q6y5coRtOvVcfDyiH46eQ=",
+  "dispatch_sha256": "sha256-W4v3ZnQx66bIfL2eCCTdIEgOkcWOw7oMg13rxlbEXuE=",
   "steps": [
     {
       "question_id": "Q1-replay-manifest",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-hcdcTxvqJNij0z9ItUPIzQhBWbrVZy3VvY4umPHaM5I=",
-      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "prompt_sha256": "sha256-S/YE49Ry8VUND0oyNE2ls9NQ8prCfASakEn4VPAE/Yc=",
+      "tool_schema_sha256": "sha256-x6ygSP9mm+7sp06lFaxpe5W3RsNc0h57hz6aHoXPYXo=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "output_sha256": "sha256-k5rkOOyAHGBCVacEk8LPULp+s5YHVzaUyCHJY4tD5jE="
     },
     {
       "question_id": "Q2-canonicalization",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-Gj+ri3gWVWxP7M9fv50c0xsgiZ2j3T6kn3A3c3EhSos=",
-      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "prompt_sha256": "sha256-9ZbmzzaBscf6H4AUj/BRIA8UjG65KtFuMHdkqjucjhA=",
+      "tool_schema_sha256": "sha256-x6ygSP9mm+7sp06lFaxpe5W3RsNc0h57hz6aHoXPYXo=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "output_sha256": "sha256-ymPE5lJqoygN0MpzqftgE1tYlyp7z+poCK2Z1Zj3mi8="
     },
     {
       "question_id": "Q3-provenance-attestation",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-g5/dW+zJvMObKyqnAdy70pUPtJcGD0DrsjkeEx/AcIY=",
-      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "prompt_sha256": "sha256-yUGaXe7X4bRhFHSKtDjxHh3xuPtg1+BmLV6jza4C0fo=",
+      "tool_schema_sha256": "sha256-x6ygSP9mm+7sp06lFaxpe5W3RsNc0h57hz6aHoXPYXo=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "output_sha256": "sha256-OSUAIhytytKihfFM1Y+p1BllUSTC+KEfb/NX86X+Kc0="
     },
     {
       "question_id": "Q4-llm-determinism",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-OfQ00IyAulvEOnZ/UpiLp+JTwF4jYUzQRaqCp3zgIbE=",
-      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "prompt_sha256": "sha256-Pq1qlM2d+twv0Bpj9oKai/wqDgprgbgrX82++lwL01A=",
+      "tool_schema_sha256": "sha256-x6ygSP9mm+7sp06lFaxpe5W3RsNc0h57hz6aHoXPYXo=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "output_sha256": "sha256-aFDm9p4/94p97NJg/vWKbYXchv6N1b0swpIfYoep1iw="
     },
     {
       "question_id": "Q5-tool-schema-drift",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-qIr9Dl8GmGeikUrgCJ62QQh8FvTNUhvdxL0Ivk/Di3M=",
-      "tool_schema_sha256": "sha256-kUC7s+wAFV4lzwrFKYp36khxCRQZWlWeFDOwhPIqGCk=",
+      "prompt_sha256": "sha256-M/W3TeerL+sC7rgduBkXme0awKZIGWc12h82tMe22UM=",
+      "tool_schema_sha256": "sha256-x6ygSP9mm+7sp06lFaxpe5W3RsNc0h57hz6aHoXPYXo=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "output_sha256": "sha256-Y1lsUdKoplgdos0r4faN6UgxXX74D/Se0AVHCiUA9dM="
     }
@@ -58,5 +58,5 @@
     "receipt_signature": "272c892124e3bc13a76b2674fa361b1d65aee6a588c74604cf4ae4e7c9440a8ba7888175b9ec1286fe87490121f694f64cd30adc3ffc0e1b31cd3365b7b38901",
     "receipt_chain_sha256": "499b63905064a5e25fd1801c5530504c94742f2183c4d3c8eb545a20cfbb112e"
   },
-  "lock_sha256": "sha256-wG+ajs+2RS9669ZRbNYENkW/78/Bcvn7ZjVKZeaz4P8="
+  "lock_sha256": "sha256-oNSayaGGWFonFxzME+D1nwB14GsXitSWL7CLD6R9zwM="
 }

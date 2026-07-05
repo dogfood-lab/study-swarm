@@ -119,7 +119,7 @@ The patterns this protocol exists to catch — each with the step that catches i
 | **Self-grading** | the synthesizing model also "verifies" | Step 4 different-family rule |
 | **Postdated-paper false-flag** | an LLM calls a real 2026 paper fabricated | why existence MUST be retrieval, not recall |
 | **Question padding** | five thin questions, two actually evidence-changing | Step 1 ("don't manufacture to hit a count") |
-| **Orphan citation** | a finding never referenced by a Step-5 choice | Step 5 (citations without a connection are noise) |
+| **Orphan citation** | a finding never referenced by a Step-5 choice | Step 5 — and made executable by `study-swarm lint --strict` (opt-in) |
 | **"Studies show…"** | a gesture with no source named | the sourcing standard / `lint` |
 
 A fuller version with corrective actions is in the [handbook](https://dogfood-lab.github.io/study-swarm/handbook/failure-modes/).

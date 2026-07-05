@@ -45,11 +45,13 @@ npm i -g @dogfood-lab/study-swarm      # or: npx @dogfood-lab/study-swarm <comma
 |---|---|
 | `study-swarm protocol` | Print the locked protocol (the source of this page). |
 | `study-swarm new <slug>` | Scaffold `<slug>.dispatch.md` — the five-step skeleton to fill in. |
-| `study-swarm lint [--json] <path…>` | Check a dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL; vague "studies show…" claims are rejected. Exit `1` on violations. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
+| `study-swarm lint [--json] [--strict] <path…>` | Check a dispatch's Research grounding: every finding needs author + year + a resolvable arXiv/DOI/URL/RFC; vague "studies show…" claims are rejected. Exit `1` on violations. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. `--strict` additionally flags **orphan citations** — a finding no Step-5 choice references (opt-in; the default gate is unchanged). |
+| `study-swarm lock --init <dispatch>` | Scaffold `<dispatch>.orchestration.json` — a fill-in-the-blanks harness record to feed to `lock … --from`. |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | Write `<dispatch>.lock.json` — pin (per Step-2 agent) the resolved model id + SHA-256 of the byte-exact prompt + SHA-256 of the tool schema, plus the Step-4 verifier receipt, in one `lock_sha256`. |
 | `study-swarm lock --verify <dispatch> [--from …]` | Re-derive the hashes and assert they match the lock; drift exits `1`. Without `--from`, checks the lock's own integrity. |
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | Flag every dispatch citing `<id>` as `evidence-withdrawn` (a tombstone sidecar — flag, never delete) and emit a content-addressed withdrawal receipt. `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`. |
 | `study-swarm requalify --check <corpus-dir>` | Fail closed (exit `1`) for any unresolved `evidence-withdrawn` flag — the andon that halts a withdrawn finding's dependents. |
+| `study-swarm requalify --status <corpus-dir> [--json]` | Read-only evidence-health view of a corpus (withdrawn vs resolved, by reason and mode). Informational (exit `0`), unlike `--check`. |
 | `study-swarm requalify --resolve <dispatch> <id> --mode removed\|regrounded [--note …]` | Clear a flag once the finding is removed or re-grounded. Idempotent; appends to the sidecar's audit trail. |
 
 A typical loop:
@@ -82,11 +84,14 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      # The canon-rollback andon: halt while any withdrawn finding is unresolved.
+      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
 ```
 
 The handoff to Step 4 is the dispatch format itself: a finding written `N. **finding.** Authors year (arXiv|DOI). implication.` — one resolvable identifier per finding — is exactly what `roleos verify-citations` extracts and gates. A `lint`-clean dispatch hands off cleanly.

@@ -231,6 +231,56 @@ try {
     if (obj.ok !== false || !Array.isArray(obj.files) || obj.files.length !== 2) throw new Error('bad multi-file {ok,files} wrapper');
     if (typeof obj.files[0].ok !== 'boolean') throw new Error('per-file ok flag missing');
   });
+  // FG-03: the --json envelope carries a versioned schema handle for machine consumers.
+  check('lint --json carries schema + study_swarm_version (FG-03)', () => {
+    const p = lintFile('sch.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    const obj = JSON.parse(run(['lint', '--json', p]).stdout);
+    if (obj.schema !== 'study-swarm.lint/v1') throw new Error(`bad lint schema: ${obj.schema}`);
+    if (!/^\d+\.\d+\.\d+/.test(obj.study_swarm_version || '')) throw new Error('missing study_swarm_version');
+  });
+  // H1: a failing lint prints a "fix and re-run" trailer, not just the raw problem list.
+  check('lint failure prints a fix-and-re-run nudge (H1)', () => {
+    const p = lintFile('nudge.dispatch.md', '# d\n\n## Research grounding\n1. **F.** 2024 (arXiv:2310.01798).\n');
+    const r = run(['lint', p]);
+    eq(r.code, 1, 'exit');
+    if (!/re-run study-swarm lint/.test(r.stderr)) throw new Error('missing fix-and-re-run nudge');
+  });
+  // --- FG-01: lint --strict orphan-citation detection ---
+  const STRICT_OK = '# d\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n2. **B.** Kim 2025 (arXiv:2506.07962). Impl.\n\n## Step 5 — Architecture\n- **C1 — choice one.** (findings 1, 2)\n';
+  check('lint --strict passes when every finding is connected in Step 5 (exit 0)', () => {
+    eq(run(['lint', '--strict', lintFile('strictok.dispatch.md', STRICT_OK)]).code, 0, 'exit');
+  });
+  check('lint --strict flags an orphan finding (exit 1, orphan-citation rule)', () => {
+    const p = lintFile('orphan.dispatch.md', '# d\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n2. **B.** Kim 2025 (arXiv:2506.07962). Impl.\n\n## Step 5 — Architecture\n- **C1 — choice.** (finding 1)\n');
+    const r = run(['lint', '--json', '--strict', p]);
+    eq(r.code, 1, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (!obj.problems.some((x) => x.rule === 'orphan-citation' && x.finding === 2)) throw new Error('expected orphan-citation on finding 2');
+  });
+  check('default lint (no --strict) does NOT flag orphans — the CI gate is unchanged', () => {
+    const p = lintFile('orphan2.dispatch.md', '# d\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n2. **B.** Kim 2025 (arXiv:2506.07962). Impl.\n\n## Step 5 — Architecture\n- **C1 — choice.** (finding 1)\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint --strict connects a finding by AUTHOR token, not just number (exit 0)', () => {
+    const p = lintFile('bytoken.dispatch.md', '# d\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n\n## Step 5 — Architecture\n- **C1 — the design follows Huang here.** no number, author only\n');
+    eq(run(['lint', '--strict', p]).code, 0, 'exit');
+  });
+  check('lint --strict connects a hyphenated surname referenced by its first component (exit 0)', () => {
+    const p = lintFile('hyphen.dispatch.md', '# d\n\n## Research grounding\n1. **A.** Garcia-Molina & Salem 1987 (DOI:10.1145/38713.38742). Impl.\n\n## Step 5 — Architecture\n- **C1 — the saga model per Garcia.** no number\n');
+    eq(run(['lint', '--strict', p]).code, 0, 'exit');
+  });
+  check('lint --strict flags a missing Step 5 section (no-step5, exit 1)', () => {
+    const p = lintFile('nostep5.dispatch.md', '# d\n\n## Research grounding\n1. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    const r = run(['lint', '--json', '--strict', p]);
+    eq(r.code, 1, 'exit');
+    if (!JSON.parse(r.stdout).problems.some((x) => x.rule === 'no-step5')) throw new Error('expected no-step5 rule');
+  });
+  check('all four shipped example dispatches are --strict clean (exemplary, exit 0)', () => {
+    for (const ex of ['self', 'v1_1', 'lock', 'canon-rollback']) {
+      const p = resolve(__dirname, `../examples/study-swarm-${ex}.dispatch.md`);
+      eq(run(['lint', '--strict', p]).code, 0, `${ex} --strict`);
+    }
+  });
 
   // --- lock: dispatch.lock.json (the PIN_PER_STEP feature) ---
   const lockDir = join(work, 'lockdir'); mkdirSync(lockDir, { recursive: true });
@@ -264,6 +314,56 @@ try {
     const r = run(['lock', dPath, '--from', bad]);
     eq(r.code, 2, 'exit');
     if (!/not valid JSON/.test(r.stderr)) throw new Error('wrong message');
+  });
+  // FG-05: lock --init scaffolds the orchestration record, and the raw scaffold builds a lock.
+  check('lock --init scaffolds an orchestration.json that builds a lock (exit 0)', () => {
+    const d = join(work, 'lockinit'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    eq(run(['lock', '--init', dp]).code, 0, 'init exit');
+    const op = join(d, 'x.orchestration.json');
+    if (!existsSync(op)) throw new Error('orchestration scaffold not created');
+    eq(run(['lock', dp, '--from', op]).code, 0, 'scaffold builds a lock');
+  });
+  check('lock --init refuses to overwrite (exit 2)', () => {
+    const d = join(work, 'lockinit2'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    run(['lock', '--init', dp]);
+    eq(run(['lock', '--init', dp]).code, 2, 'exit');
+  });
+  check('lock --init on a nonexistent dispatch exits 2', () => {
+    eq(run(['lock', '--init', join(work, 'no-such.dispatch.md')]).code, 2, 'exit');
+  });
+  // PH-05: a caller-supplied output_sha256 that is not an SRI digest is rejected where it enters.
+  check('lock rejects a malformed output_sha256 at build time (PH-05, exit 2)', () => {
+    const d = join(work, 'badhash'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: 'claude-opus-4-8', prompt: 'P', tool_schema: { type: 'object' }, output_sha256: 'TODO' }] }));
+    const r = run(['lock', dp, '--from', op]);
+    eq(r.code, 2, 'exit');
+    if (!/output_sha256/.test(r.stderr)) throw new Error('expected output_sha256 rejection');
+  });
+  // FG-06: a prompt whose text equals a schema's canonical JSON must NOT collide (domain separation).
+  check('domain separation: a prompt equal to a schema JCS does not collide, and the lock is v2 (FG-06)', () => {
+    const d = join(work, 'domsep'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: 'claude-opus-4-8', prompt: '{}', tool_schema: {} }] }));
+    eq(run(['lock', dp, '--from', op]).code, 0, 'build');
+    const lock = JSON.parse(readFileSync(join(d, 'x.lock.json'), 'utf8'));
+    if (lock.schema !== 'dispatch.lock/v2') throw new Error(`expected dispatch.lock/v2, got ${lock.schema}`);
+    if (lock.steps[0].prompt_sha256 === lock.steps[0].tool_schema_sha256) throw new Error('text/jcs digests collided — domain separation failed');
+  });
+  // PH-04: a stale-schema (v1) lock verifies as "regenerate", not a confusing hash mismatch.
+  check('lock --verify on a stale-schema lock says regenerate, not hash mismatch (PH-04, exit 1)', () => {
+    buildClean();
+    const lock = JSON.parse(readFileSync(lockJsonPath, 'utf8'));
+    lock.schema = 'dispatch.lock/v1'; // forge an old schema string
+    writeFileSync(lockJsonPath, JSON.stringify(lock, null, 2));
+    const r = run(['lock', '--verify', dPath]);
+    eq(r.code, 1, 'exit');
+    if (!/regenerate/.test(r.stderr) || !/schema/.test(r.stderr)) throw new Error('expected a schema-regenerate message');
+    if (/lock_sha256 mismatch/.test(r.stderr)) throw new Error('should not surface as a hash mismatch');
   });
   check('lock builds a lock.json (exit 0) pinning model + prompt + tool-schema + output hashes', () => {
     const r = run(['lock', dPath, '--from', orchPath]);
@@ -528,10 +628,47 @@ try {
     const c = join(work, 'wd-shape'); mkdirSync(c, { recursive: true });
     writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
     const obj = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c, '--json']).stdout);
-    if (obj.schema !== 'withdrawal-receipt/v1') throw new Error('bad schema');
+    if (obj.schema !== 'withdrawal-receipt/v2') throw new Error('bad schema');
     if (obj.reason !== 'retracted') throw new Error('reason field missing');
     if (!Array.isArray(obj.dependents) || obj.dependents.length !== 1) throw new Error('dependents wrong');
     if (!obj.dependents[0].dispatch || !Array.isArray(obj.dependents[0].findings)) throw new Error('dependent shape wrong');
+  });
+  // FG-04: requalify --status is a read-only view (exit 0), with a versioned --json envelope.
+  check('requalify --status is a read-only view (exit 0) with schema + totals + by_reason (FG-04)', () => {
+    const c = join(work, 'status'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    eq(run(['requalify', '--status', c]).code, 0, 'status is informational (exit 0)');
+    const obj = JSON.parse(run(['requalify', '--status', c, '--json']).stdout);
+    if (obj.schema !== 'study-swarm.status/v1') throw new Error('bad status schema');
+    if (obj.totals.withdrawn !== 1 || obj.totals.resolved !== 0) throw new Error(`bad totals ${JSON.stringify(obj.totals)}`);
+    if (obj.by_reason.retracted !== 1) throw new Error('bad by_reason');
+  });
+  check('requalify --status on a nonexistent corpus exits 2', () => eq(run(['requalify', '--status', join(work, 'no-status-dir')]).code, 2, 'exit'));
+  // PH-01: a non-object (null) sidecar is a reported problem, not an undiagnosable crash.
+  check('requalify --check on a null sidecar reports a problem, not a crash (PH-01, exit 1)', () => {
+    const c = join(work, 'nullsidecar'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'bad.withdrawn.json'), 'null'); // valid JSON, not an object
+    const r = run(['requalify', '--check', c]);
+    eq(r.code, 1, 'exit');
+    if (!/not a JSON object/.test(r.stderr)) throw new Error('expected a "not a JSON object" problem naming the file');
+  });
+  // H3: withdraw on an uncited id nudges toward lint + --from instead of a dead end.
+  check('withdraw on an uncited id nudges toward lint / --from (H3, exit 2)', () => {
+    const c = join(work, 'h3'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND('arXiv:2310.01798'));
+    const r = run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    eq(r.code, 2, 'exit');
+    if (!/study-swarm lint/.test(r.stderr)) throw new Error('expected a lint nudge');
+  });
+  // H2: the --mode removed blocked-halt surfaces the two-way fork legibly.
+  check('requalify --resolve --mode removed blocked message shows the two-way fork (H2, exit 1)', () => {
+    const c = join(work, 'h2'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    const r = run(['requalify', '--resolve', join(c, 'a.dispatch.md'), FIND_ID, '--mode', 'removed']);
+    eq(r.code, 1, 'exit');
+    if (!/Two ways forward/.test(r.stderr) || !/regrounded/.test(r.stderr)) throw new Error('expected the two-way fork message');
   });
 } finally {
   rmSync(work, { recursive: true, force: true });

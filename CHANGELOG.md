@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] — 2026-07-05
+
+A full dogfood-swarm pass — health hardening, a feature pass making more of the protocol executable, and a security hardening of the lock's content-addressing. **The breaking change** (hence the major bump): the `dispatch.lock.json` / tombstone / receipt hash format is now domain-separated (artifact schema **v2**), so a lock written by an earlier version (≤ 1.3) no longer verifies until it is regenerated (`study-swarm lock <dispatch> --from <orchestration.json>`) — `lock --verify` now says exactly that, instead of reporting a confusing hash mismatch. The CLI's command surface is otherwise fully backward-compatible and additive.
+
+### Added
+
+- **`study-swarm lint --strict`** — makes the protocol's one otherwise-unexecutable failure mode deterministic: an **orphan citation** (a Step-3 finding no Step-5 choice references, by number or author) is flagged, because "citations without a connection are noise." Opt-in, so the default CI gate is unchanged. New `orphan-citation` / `no-step5` rule ids. (All four shipped example dispatches were made `--strict`-clean.)
+- **`study-swarm lock --init <dispatch>`** — scaffolds a fill-in-the-blanks `<dispatch>.orchestration.json` (the harness record `lock … --from` consumes), mirroring what `new` does for a dispatch.
+- **`study-swarm requalify --status <corpus-dir> [--json]`** — a read-only evidence-health view of a corpus: withdrawn vs resolved counts, a breakdown by reason and resolution mode, and per-dispatch lines. Informational (exit 0), distinct from the `--check` gate.
+- `lint --json` now carries a versioned `schema` + `study_swarm_version` envelope, matching the lock/sidecar/receipt objects, so a CI/roleos consumer can detect a shape change.
+- `lint` now accepts a bare **RFC number** (e.g. `RFC 5280`) as a resolvable identifier — the sourcing standard already blessed it and the canon-rollback normalizer already recognized it; the linter now agrees.
+
+### Changed
+
+- **Security — domain-separated content-addressing (lock schema v1 → v2).** Every digest now carries a domain tag, so a prompt whose literal text equals a tool schema's canonical JSON can no longer collide with that schema's hash. `lock`, the tombstone sidecar, and the withdrawal receipt bump to schema `v2`; a `v1` artifact read by this version is reported as **"regenerate"**, not a hash mismatch. A caller-supplied `output_sha256` is validated to the `sha256-<base64>` shape where it enters. The two shipped example locks are regenerated.
+- **Robustness.** Fixed a **catastrophic-backtracking (ReDoS)** in the author-citation regex that could hang the CI-gating `lint` on a long author run with no trailing year; the rewrite is linear-time and semantically identical on real citations. Corpus walks (`lint`/`withdraw`/`requalify` over a directory) now skip an unreadable subdirectory with a warning instead of aborting the whole run, don't follow symlinks, and break directory-junction cycles. A non-object (`null`) sidecar is now a reported problem, not a crash. A URL path segment like `/2024/` no longer satisfies the year requirement.
+- **Humanization.** A failed `lint` now prints a "fix and re-run" trailer; the `requalify --resolve --mode removed` block message presents its two recovery paths as a legible fork; `withdraw` on an uncited id points you at `lint` and `--from`; the withdrawal-receipt line reads plainly instead of `(stdout: pass --json)`.
+- **Docs.** The README + handbook CI recipe now include the `requalify --check` andon step (it was documented in the example workflow only); the handbook halt table gains the `PARTIALLY_SUPPORTED` verdict; `SECURITY.md` + `SHIP_GATE.md` now enumerate the `lock`/`withdraw`/`requalify` write surface; the landing page now surfaces the CLI (it previously showed none of the six commands).
+
+### Release CI
+
+- The release workflow now verifies the **packed tarball** is runnable from its shipped files only — catching a `files`-allowlist regression a working-tree smoke test can't — and pins `npm@^11.5.1` for OIDC trusted publishing instead of floating `@latest`.
+
+Smoke coverage: 57 → 92 checks.
+
 ## [1.3.0] — 2026-06-30
 
 Makes the **canon-rollback** executable. A verified finding becomes canon — it informs a downstream design decision — so when it is later **withdrawn** (a citation turns out fabricated/misattributed on a re-run, a cited paper is retracted, or the gate flips it) a `git revert` is not enough: the finding already propagated. This release ships the protocol's named `requalify_dependent_slices` compensator as three deterministic, network-free verbs. The design was grounded by running study-swarm on this feature itself — five load-bearing questions (revocation propagation, machine-readable status states, scholarly retraction, sound compensators, build-system staleness/tombstones/contrastive surfacing) dispatched to parallel retrieval-grounded agents; all 27 findings were gated through Step 4 (`roleos verify-citations` → prism, a different model family, reasoning-stripped) with a public-key-verified Ed25519 receipt before any informed the design.
@@ -115,6 +140,8 @@ First stable release. A dogfood-swarm health + feature pass hardened the CLI and
 - `SECURITY.md`, MIT `LICENSE`, project logo.
 - Landing page + Starlight handbook at <https://dogfood-lab.github.io/study-swarm/>.
 
+[2.0.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v2.0.0
+[1.3.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.3.0
 [1.2.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dogfood-lab/study-swarm/releases/tag/v1.0.0

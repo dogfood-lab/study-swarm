@@ -75,11 +75,13 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 |---|---|
 | `study-swarm protocol` | Imprime o protocolo completo – as cinco etapas, a tabela de interrupção e o padrão de referência. |
 | `study-swarm new <slug>` | Cria um arquivo `<slug>.dispatch.md` com o esqueleto das cinco etapas para preencher. |
-| `study-swarm lint [--json] <path…>` | Verifica a *fundamentação da pesquisa* de uma análise em relação ao padrão de referência – cada achado precisa de um autor, um ano e um identificador resolvível (arXiv / DOI / URL); “estudos mostram…” sem embasamento é rejeitado. Sai com `1` em caso de violações, para que valide o CI. Um `<path>` pode ser um arquivo, um diretório (analisado recursivamente para `*.dispatch.md`) ou `-` para stdin; `--json` emite um relatório legível por máquina. |
+| `study-swarm lint [--json] [--strict] <path…>` | Verifique a *base de pesquisa* de um relatório em relação ao padrão de fontes – cada conclusão deve ter um autor, um ano e um identificador que possa ser localizado (arXiv / DOI / URL / RFC); argumentos vagos do tipo "estudos mostram…" são rejeitados. Retorne `1` em caso de violações, para que isso impeça a execução do CI. Um `<caminho>` pode ser um arquivo, um diretório (verificado recursivamente para `*.dispatch.md`) ou `-` para entrada padrão; `--json` gera um relatório legível por máquina. `--strict` também sinaliza **citações órfãs** – uma conclusão que nenhuma escolha da Etapa 5 referencia –, já que "citações sem conexão são ruído" (opcional, portanto, a configuração padrão do CI permanece inalterada). |
+| `study-swarm lock --init <dispatch>` | Crie o arquivo `<dispatch>.orchestration.json` – um modelo de registro para preencher os campos (uma etapa por agente da Etapa 2) para fornecer ao comando `lock … --from`. |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | Fixe um envio para reprodução – crie o arquivo `<dispatch>.lock.json` com informações de conteúdo, conforme o agente da Etapa 2, incluindo o **ID do modelo resolvido** + o **SHA-256 do prompt exato em bytes** + o **SHA-256 do esquema da ferramenta**, mais o **comprovante do verificador** da Etapa 4, tudo reunido em um único arquivo `lock_sha256`. |
 | `study-swarm lock --verify <dispatch> [--from …]` | Recalcule esses hashes e verifique se correspondem ao bloqueio; qualquer desvio resulta em saída `1`, portanto, controla o CI como um arquivo de bloqueio de pacote. Sem `--from`, verifica a própria integridade do bloqueio. |
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **Mecanismo de compensação para reversão do canon.** Marcar cada registro no corpus cujo *fundamento da pesquisa* cite `<id>` como `evidência-retirada` (um arquivo auxiliar `<slug>.withdrawn.json` — marcar, nunca excluir) e emitir um comprovante de retirada com base no conteúdo. `--reason` ∈ `fabricado · atribuído incorretamente · revogado · verificador alterado · outro`. |
 | `study-swarm requalify --check <corpus-dir>` | Falhar em modo fechado (sair com código `1`) para qualquer registro que contenha uma marcação `evidência-retirada` não resolvida — o sinalizador que **interrompe** os elementos dependentes de um resultado retirado até que seja removido ou reavaliado. Gates CI. |
+| `study-swarm requalify --status <corpus-dir> [--json]` | Visualização somente leitura do estado de validade das evidências de um corpus – contagem de conclusões retiradas versus resolvidas, uma divisão por motivo e modo de resolução, linhas por relatório. Informativo (retorna `0`), diferente da verificação `--check`. |
 | `study-swarm requalify --resolve <registro> <id> --mode removed\ | regrounded [--note …]` | Remover uma marcação assim que o resultado for removido (a citação desaparecer) ou reavaliado (reverificado e validado pelo executor irmão; `--note` registra a confirmação). Idempotente; adiciona ao histórico de auditoria do arquivo auxiliar. |
 
 `lint` é determinístico – sem chamadas de modelo – portanto, é seguro no CI. Ele aplica o **padrão de referência da Etapa 3** localmente; a verificação baseada em modelo da **Etapa 4** ainda depende de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
@@ -112,11 +114,15 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      # Halt the build while any finding that became canon is withdrawn and not yet
+      # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
+      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
 ```
 
 ### Fixe um envio para reprodução (`dispatch.lock.json`)
@@ -149,7 +155,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Status
 
-Um protocolo funcional, verificado externamente por sua própria infraestrutura — uma família diferente de modelos verifica suas citações (veja a prova acima). **v1.1** aprimora o verificador, onde a primeira versão era silenciosa: fundamentação decomposta/ternária, fundamentação no momento da geração, cascata controlada por um oráculo para combinar lentes e abstinência calibrada — cada um baseado no registro verificado da versão 1.1. **v1.2** torna um registro reproduzível: `study-swarm lock` fixa o modelo resolvido, o prompt e o esquema de ferramentas por etapa, além do comprovante do verificador, e `lock --verify` falha em modo fechado em caso de desvio. **v1.3** torna a reversão executável: quando um resultado que já se tornou canon é retirado, `study-swarm withdraw` marca todos os elementos dependentes e `requalify --check` os interrompe, fazendo com que falhem até que sejam removidos ou reavaliados — um compensador nomeado, com comprovante e idempotente. Este repositório é a referência pública; [PROTOCOL.md](PROTOCOL.md) é a forma executável. Faz parte da família [dogfood-lab](https://github.com/dogfood-lab) — métodos e demonstrações para construir na era da IA.
+Um protocolo funcional, verificado externamente por seu próprio mecanismo – uma família de modelos diferente verifica suas citações (veja a prova acima). A **versão 1.1** aprimora o verificador, onde a primeira versão estava silenciosa: base de pesquisa decomposta/ternária, base de pesquisa no momento da geração, um sistema em cascata controlado por um oráculo para combinar lentes e abstinência calibrada – cada um baseado na verificação da versão 1.1 do relatório. A **versão 1.2** torna um relatório reproduzível: `study-swarm lock` fixa o modelo, o prompt e o esquema de ferramentas resolvidos por etapa, além do recibo do verificador, e `lock --verify` falha se houver desvio. A **versão 1.3** torna a reversão executável: quando uma conclusão que já se tornou um padrão é retirada, `study-swarm withdraw` sinaliza todas as dependências e `requalify --check` interrompe sua execução até que sejam removidas ou reavaliadas – um compensador nomeado, com recibo e idempotente. A **versão 2.0** torna mais partes do protocolo executáveis e reforça o bloqueio: `lint --strict` sinaliza citações órfãs – a única falha detectável pela CLI –, `lock --init` cria o modelo de registro, `requalify --status` lê o estado de validade das evidências de um corpus e o endereçamento de conteúdo do bloqueio é separado por domínio (esquema de artefato v2 – um bloqueio de uma versão anterior é regenerado em vez de ser sinalizado incorretamente como adulterado; a interface de linha de comando permanece compatível com versões anteriores). Este repositório é a referência pública; [PROTOCOL.md](PROTOCOL.md) é a forma executável. Parte da família [dogfood-lab](https://github.com/dogfood-lab) – métodos e demonstrações para construir na era da IA.
 
 Licenciado sob MIT.
 

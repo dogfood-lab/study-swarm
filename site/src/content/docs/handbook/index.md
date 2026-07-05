@@ -19,6 +19,8 @@ It applies its own medicine. The protocol prescribes verifier-protected envelope
 4. **Verify externally** — a different model family, reasoning-stripped, checks every citation.
 5. **Connect** each architectural choice back to a finding by number.
 
+Those five are the core. A verified finding then becomes **canon** — it has a lifecycle: pin it for byte-replay with [`lock`](./running-it/#pin-a-dispatch-for-replay), and if it is later retracted, [`withdraw` / `requalify`](./running-it/#roll-back-a-withdrawn-finding) roll it back across every dependent.
+
 ## Where to go next
 
 - **[The five steps](./the-protocol/)** — the locked execution shape, in detail.

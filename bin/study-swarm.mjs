@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // study-swarm — thin CLI for the research-grounded design protocol.
 // Zero runtime dependencies. Commands: protocol | new | lint | help | version.
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -19,9 +19,15 @@ USAGE
 COMMANDS
   protocol                 Print the locked protocol (the five steps + halt rules).
   new <slug>               Scaffold a dispatch file <slug>.dispatch.md to fill in.
-  lint [--json] <path...>  Check dispatches' citations against the sourcing standard.
+  lint [--json] [--strict] <path...>
+                           Check dispatches' citations against the sourcing standard.
                            A <path> may be a file, a directory (linted recursively for
                            *.dispatch.md), or "-" to read one dispatch from stdin.
+                           --strict also flags orphan citations (a finding no Step-5 choice
+                           references by number or author — "citations without a connection
+                           are noise"); opt-in, so the default CI gate is unchanged.
+  lock --init <dispatch>   Scaffold <dispatch>.orchestration.json — a fill-in-the-blanks
+                           harness record to feed to "lock <dispatch> --from".
   lock <dispatch> --from <orchestration.json>
                            Emit <dispatch>.lock.json — pin (per Step-2 agent) the resolved
                            model + SHA-256 of the byte-exact prompt + SHA-256 of the tool
@@ -39,6 +45,10 @@ COMMANDS
                            Fail closed (exit 1) for any dispatch carrying an unresolved
                            evidence-withdrawn flag — the andon that HALTS a withdrawn finding's
                            dependents until it is removed or re-grounded. Gates CI.
+  requalify --status <corpus-dir> [--json]
+                           Read-only evidence-health VIEW of a corpus: withdrawn vs resolved
+                           counts, a breakdown by reason and resolution mode, per-dispatch
+                           lines. Informational (exit 0), unlike the --check gate.
   requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]
                            Clear a flag once the finding is removed (the citation is gone) or
                            re-grounded (re-verified clean by the sibling runner; --note records
@@ -153,8 +163,46 @@ const BANNED = /\b(studies show|research suggests|it'?s well[- ]established|well
 // trailing year, hanging the CI-gating `lint` command.
 const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:,?\s+(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+)){0,24}\s+\(?(?:19|20)\d{2}/u;
 
-// Check one dispatch's text. Returns a structured result; never exits.
-function lintText(label, raw) {
+// --- strict mode: Step-5 connection / orphan-citation check (opt-in --strict) --------------
+// Step 5 requires each finding to inform a design choice — "citations without a connection are
+// noise" (PROTOCOL.md). This makes the protocol's one otherwise-unexecutable failure mode ("orphan
+// citation") deterministic: a Step-3 finding whose number OR first-author token is never referenced
+// in the "Step 5 / Architecture" section is flagged. Deliberately LIBERAL about what counts as a
+// reference — a missed orphan is safer than a false orphan — so it never fails a dispatch that
+// connected a finding in any reasonable numeric ("(findings 1, 3)") or prose ("Kim 2025") form.
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// The first-author surname token of a finding: the first Capitalized word after the bold **title**.
+function authorTokenOf(findingText) {
+  const afterBold = String(findingText).replace(/^\s*\d+\.\s*/, '').replace(/^\s*\*\*[^*]*\*\*/, '');
+  const m = afterBold.match(/\p{Lu}[\p{L}.'’-]+/u);
+  return m ? m[0] : null;
+}
+// Finding numbers referenced in a Step-5 body: any "#N", plus every integer following the word
+// "finding"/"findings" (covers "(findings 1, 3 and 5)"). Liberal.
+function referencedNumbers(body) {
+  const nums = new Set();
+  for (const m of body.matchAll(/#\s*(\d+)/g)) nums.add(Number(m[1]));
+  for (const m of body.matchAll(/\bfindings?\b[\s:#-]*((?:\d+[\s,#&-]*(?:and\s+)?)+)/gi)) {
+    for (const d of m[1].match(/\d+/g) || []) nums.add(Number(d));
+  }
+  return nums;
+}
+// The Step-5 / Architecture section body (last matching heading → next heading/EOF), or null.
+function step5Body(lines) {
+  let s = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^#{1,6}\s+(.*?)\s*$/);
+    if (h && /(step\s*5|architecture)/i.test(h[1])) s = i;
+  }
+  if (s === -1) return null;
+  let e = lines.length;
+  for (let i = s + 1; i < lines.length; i++) { if (/^#{1,6}\s/.test(lines[i])) { e = i; break; } }
+  return lines.slice(s + 1, e).join('\n');
+}
+
+// Check one dispatch's text. Returns a structured result; never exits. `strict` adds the Step-5
+// orphan-citation check (opt-in, so the default CI gate stays stable).
+function lintText(label, raw, strict) {
   const lines = raw.split(/\r?\n/);
   const problems = []; // { finding, line, rule, message }
   const add = (rule, message, line = null, finding = null) => problems.push({ finding, line, rule, message });
@@ -219,30 +267,69 @@ function lintText(label, raw) {
     }
   });
 
+  // --strict: flag orphan citations — a finding no Step-5 choice connects to (Step 5 / orphan-citation).
+  if (strict) {
+    const body = step5Body(lines);
+    if (body === null) {
+      add('no-step5', 'strict: no "Step 5" / "Architecture" section found to check finding connections against.');
+    } else {
+      const refs = referencedNumbers(body);
+      findings.forEach((f, i) => {
+        const n = i + 1;
+        const tok = authorTokenOf(f.text);
+        // Match the author token OR (for a hyphenated surname like "Garcia-Molina") its first
+        // component, so a Step-5 reference to just "Garcia" still connects — the liberal direction.
+        const alts = tok ? [...new Set([tok, tok.split('-')[0]])].filter((t) => t.length >= 2) : [];
+        const tokHit = alts.some((t) => new RegExp('(?<![\\p{L}])' + escRe(t) + '(?![\\p{L}])', 'iu').test(body));
+        if (!refs.has(n) && !tokHit) {
+          add('orphan-citation', `finding ${n}: no Step-5 choice references it (by number or author) — a citation without a connection is noise (Step 5).`, f.line, n);
+        }
+      });
+    }
+  }
+
   return { file: label, ok: problems.length === 0, findingCount: findings.length, problems, findings: parsed };
 }
 
-// Recursively collect *.dispatch.md files under a directory (skips node_modules/.git).
-function walkDispatches(dir) {
+// Recursively collect files whose name matches `re` under `dir`, sorted for determinism.
+// Resilient by design:
+//  - an unreadable directory (EACCES/EPERM/ENOTDIR) is SKIPPED with a stderr note, never fatal, so a
+//    single bad node does not abort a whole-corpus lint / withdraw / requalify (PH-02);
+//  - symlinked entries are not followed, and a realpath `seen` set breaks directory-junction cycles
+//    (common on Windows) that would otherwise recurse until stack / path-length exhaustion (PH-03).
+// Skips node_modules/.git.
+function walkFiles(dir, re, seen) {
+  seen = seen || new Set();
+  let real; try { real = realpathSync(dir); } catch { real = dir; }
+  if (seen.has(real)) return []; // already visited via another path — junction/symlink cycle guard
+  seen.add(real);
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); }
+  catch (err) { process.stderr.write(`study-swarm: skipping ${dir}: ${err && err.code ? err.code : err.message}\n`); return []; }
   const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    if (entry.isSymbolicLink()) continue; // don't follow symlinks (cycle + directory-escape safety)
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkDispatches(full));
-    else if (/\.dispatch\.md$/i.test(entry.name)) out.push(full);
+    if (entry.isDirectory()) out.push(...walkFiles(full, re, seen));
+    else if (re.test(entry.name)) out.push(full);
   }
   return out.sort();
 }
+function walkDispatches(dir) { return walkFiles(dir, /\.dispatch\.md$/i); }
 
 function readTarget(p) {
   try { return { label: p, raw: readFileSync(p, 'utf8') }; }
   catch (err) { fail(2, `cannot read ${p}: ${err && err.code ? err.code : err.message}`); }
 }
 
+const LINT_SCHEMA = 'study-swarm.lint/v1'; // versioned handle for --json consumers (FG-03)
+
 function cmdLint(args) {
   const json = args.includes('--json');
-  const paths = args.filter((a) => a !== '--json');
-  if (paths.length === 0) fail(2, 'usage: study-swarm lint [--json] <file|dir|-> [more...]');
+  const strict = args.includes('--strict'); // opt-in: also flag Step-5 orphan citations (FG-01)
+  const paths = args.filter((a) => a !== '--json' && a !== '--strict');
+  if (paths.length === 0) fail(2, 'usage: study-swarm lint [--json] [--strict] <file|dir|-> [more...]');
 
   const targets = [];
   for (const p of paths) {
@@ -263,20 +350,23 @@ function cmdLint(args) {
     }
   }
 
-  const results = targets.map((t) => lintText(t.label, t.raw));
+  const results = targets.map((t) => lintText(t.label, t.raw, strict));
   const anyFail = results.some((r) => !r.ok);
 
   if (json) {
-    const payload = results.length === 1 ? results[0] : { ok: !anyFail, files: results };
+    // A versioned envelope so a CI/roleos consumer can detect a shape change (FG-03), matching the
+    // schema/version pattern the lock, sidecar, and receipt objects already carry.
+    const meta = { schema: LINT_SCHEMA, study_swarm_version: VERSION };
+    const payload = results.length === 1 ? { ...meta, ...results[0] } : { ...meta, ok: !anyFail, files: results };
     process.stdout.write(JSON.stringify(payload) + '\n');
     process.exit(anyFail ? 1 : 0);
   }
 
   for (const r of results) {
     if (r.ok) {
-      process.stdout.write(`ok ${r.file}: ${r.findingCount} finding(s), all sourced.\n`);
+      process.stdout.write(`ok ${r.file}: ${r.findingCount} finding(s), all sourced${strict ? ' and connected' : ''}.\n`);
     } else {
-      process.stderr.write(`x ${r.file}: ${r.problems.length} sourcing issue(s)\n`);
+      process.stderr.write(`x ${r.file}: ${r.problems.length} ${strict ? 'issue(s)' : 'sourcing issue(s)'}\n`);
       for (const pr of r.problems) process.stderr.write(`  - ${pr.message}\n`);
     }
   }
@@ -285,6 +375,9 @@ function cmdLint(args) {
       `\nStep 3 (sourcing FORM) is satisfied — this does NOT confirm the citations exist or support the claim.\n` +
       `Run Step 4 (existence + groundedness, a different model family):  roleos verify-citations <file>\n`,
     );
+  } else {
+    // Symmetry with the clean-path nudge: tell the user what to do next (H1).
+    process.stderr.write(`\nFix the issue(s) above, then re-run study-swarm lint. (This checks Step 3 sourcing FORM${strict ? ' + Step 5 connections' : ''} only.)\n`);
   }
   process.exit(anyFail ? 1 : 0);
 }
@@ -295,17 +388,26 @@ function cmdLint(args) {
 // (resolved models + byte-exact prompts + tool schemas + verifier receipt); the CLI only
 // canonicalizes + hashes + validates it. No network, no model calls (L2).
 
-const LOCK_SCHEMA = 'dispatch.lock/v1';
+const LOCK_SCHEMA = 'dispatch.lock/v2';
 
 // Self-describing digest "sha256-<base64>" — the W3C Subresource Integrity form: algorithm-
 // prefixed (so it's algorithm-agile) and used fail-closed on mismatch (L9; lock dispatch finding 38).
 function sriBytes(buf) { return 'sha256-' + createHash('sha256').update(buf).digest('base64'); }
+// Domain-separation tags (v2): a TEXT preimage and a structured-JSON (JCS) preimage are hashed in
+// DISJOINT spaces, so a prompt whose literal text happens to equal some tool schema's canonical JSON
+// can never produce the same digest as that schema (the tagged-hash / DSSE "hash known bytes with a
+// context" rule the lock dispatch cites — TUF/Rekor/CT). Without a tag, jcsDigest({}) === sriText('{}').
+// The tag carries the schema major, so bumping it is itself a lock-format change — hence the v1 -> v2
+// bump on LOCK_SCHEMA / WITHDRAWN_SCHEMA / RECEIPT_SCHEMA, and the schema gate on read that turns a
+// stale-format lock into a clear "regenerate" message instead of a confusing hash mismatch.
+const DOMAIN_TEXT = 'study-swarm/v2/text\n';
+const DOMAIN_JCS = 'study-swarm/v2/jcs\n';
 // Normalize TEXT before hashing so the same content hashes identically across platforms — strip a
 // BOM, fold CRLF/CR -> LF, NFC-normalize. Without this, a CRLF working tree (Windows) and an LF
 // checkout (git/CI) produce different hashes — the exact cross-platform drift our Q2 findings warn
 // about (RFC 8259 BOM, UAX #15 NFC, and CRLF/LF). Applied to every text input that gets hashed.
 function normText(s) { s = String(s); if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1); return s.replace(/\r\n?/g, '\n').normalize('NFC'); }
-function sriText(str) { return sriBytes(Buffer.from(normText(str), 'utf8')); }
+function sriText(str) { return sriBytes(Buffer.from(DOMAIN_TEXT + normText(str), 'utf8')); }
 
 // RFC 8785 (JCS) canonical JSON, for the structured JSON the CLI assembles ITSELF (the tool
 // surface and the lock body): NFC-normalize strings, sort object keys by UTF-16 code unit (JS
@@ -332,7 +434,7 @@ function jcs(value) {
   };
   return ser(value);
 }
-function jcsDigest(value) { return sriBytes(Buffer.from(jcs(value), 'utf8')); }
+function jcsDigest(value) { return sriBytes(Buffer.from(DOMAIN_JCS + jcs(value), 'utf8')); }
 
 // The lock sits beside its dispatch: <dir>/<stem>.lock.json (stem strips a trailing .dispatch.md).
 function lockPathFor(dispatch) {
@@ -362,8 +464,14 @@ function buildLockObject(dispatchPath, orchestration) {
     if (s.params && typeof s.params === 'object') rec.params = s.params;
     // L7 — output hash for DRIFT DETECTION only (not determinism). The harness may ship the raw
     // output (the CLI hashes it) OR a pre-computed output_sha256 (large outputs needn't be shipped).
-    if (typeof s.output_sha256 === 'string') rec.output_sha256 = s.output_sha256;
-    else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output);
+    // A caller-supplied digest is validated to the SRI sha256- shape here, so a malformed hash is
+    // rejected where it enters rather than mis-surfacing as "drift" on a later verify (PH-05).
+    if (typeof s.output_sha256 === 'string') {
+      if (!/^sha256-[A-Za-z0-9+/]+=*$/.test(s.output_sha256)) {
+        fail(2, `orchestration step ${i + 1} output_sha256 is not an "sha256-<base64>" digest: "${s.output_sha256}"`);
+      }
+      rec.output_sha256 = s.output_sha256;
+    } else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output);
     return rec;
   });
   const lock = {
@@ -383,12 +491,27 @@ function buildLockObject(dispatchPath, orchestration) {
   return lock;
 }
 
+// A forward-compat guard (PH-04): an artifact whose `schema` string names a version this CLI does
+// not write is reported as "regenerate", not as a confusing hash/integrity mismatch — because the
+// hash preimage (the domain tag) changes with the schema major, a v1 artifact read by a v2 CLI would
+// otherwise fail self-integrity with a misleading "the body was edited" accusation. Absent schema =
+// no gate (the self-integrity check still applies). Returns a message string, or null when in-version.
+function staleSchema(stored, expected, kind, path) {
+  if (stored && typeof stored === 'object' && typeof stored.schema === 'string' && stored.schema !== expected) {
+    return `${path}: ${kind} is schema "${stored.schema}"; this study-swarm v${VERSION} understands "${expected}" — regenerate it (the hash format changed between schema versions).`;
+  }
+  return null;
+}
+
 // Verify a lock: self-integrity always; source-drift too when an orchestration record is supplied.
 // Strict-match, fail-closed (L8): returns a list of problems (empty = clean).
 function verifyLockObject(dispatchPath, lockPath, orchestration) {
   let stored;
   try { stored = JSON.parse(readFileSync(lockPath, 'utf8')); }
   catch (err) { fail(2, `cannot read lock ${lockPath}: ${err && err.code ? err.code : err.message}`); }
+  // 0) Stale-format gate — a wrong-schema lock is "regenerate", not a hash mismatch (PH-04).
+  const stale = staleSchema(stored, LOCK_SCHEMA, 'lock', lockPath);
+  if (stale) return [stale];
   const problems = [];
   // 1) Self-integrity — recompute lock_sha256 over the stored body (detects a hand-edited lock).
   if (!stored || typeof stored !== 'object' || typeof stored.lock_sha256 !== 'string') {
@@ -419,7 +542,46 @@ function verifyLockObject(dispatchPath, lockPath, orchestration) {
   return problems;
 }
 
+// FG-05 — scaffold the orchestration.json the harness must supply, mirroring what `new` does for a
+// dispatch. A deterministic Write of a template (no network, no models); refuses to overwrite. The
+// orchestration record is the harder artifact to hand-author, and its shape was documented only in
+// the large worked examples — this gives a fill-in-the-blanks starting point.
+const orchTemplate = () => JSON.stringify({
+  _note: 'study-swarm orchestration record — the harness-emitted input to `study-swarm lock <dispatch> --from <this file>`. One steps[] entry per Step-2 research agent; replace every <...> placeholder. A full worked record: examples/study-swarm-lock.orchestration.json. Optional per step: params, schema_dialect, output_sha256 (an "sha256-<base64>" digest for drift detection).',
+  steps: [
+    {
+      question_id: '<Q1-short-slug>',
+      resolved_model: '<resolved model id, e.g. claude-opus-4-8 — never a floating alias>',
+      prompt: '<the byte-exact prompt string this research agent was given>',
+      tool_schema: { type: 'object', properties: {} },
+      schema_dialect: 'https://json-schema.org/draft/2020-12/schema',
+    },
+  ],
+  verification: {
+    runner: 'roleos verify-citations',
+    tool: 'prism verify --type citations',
+    verifier_family: '<a DIFFERENT model family than the synthesizer>',
+    receipt_id: '<prism-receipt-id>',
+    receipt_chain_sha256: '<the verifier receipt chain hash>',
+  },
+}, null, 2) + '\n';
+
+function orchPathFor(dispatch) {
+  const base = dispatch.split(/[\\/]/).pop().replace(/(\.dispatch)?\.md$/i, '');
+  return join(dirname(dispatch), `${base}.orchestration.json`);
+}
+
 function cmdLock(args) {
+  if (args.includes('--init')) { // FG-05 — scaffold the orchestration record for a dispatch
+    const dispatch = args.filter((a) => a !== '--init')[0];
+    if (!dispatch) fail(2, 'usage: study-swarm lock --init <dispatch>');
+    if (!existsSync(dispatch)) fail(2, `dispatch not found: ${dispatch}`);
+    const out = orchPathFor(dispatch);
+    if (existsSync(out)) fail(2, `refusing to overwrite existing ${out}`);
+    writeFileSync(out, orchTemplate(), 'utf8');
+    process.stdout.write(`Created ${out}\nFill in each step (one per Step-2 research agent), then:  study-swarm lock ${dispatch} --from ${out}\n`);
+    return;
+  }
   const verify = args.includes('--verify');
   const rest = args.filter((a) => a !== '--verify');
   let orchPath = null;
@@ -471,8 +633,8 @@ function cmdLock(args) {
 // receipts deterministically (file reads, JSON I/O, SHA-256); the actual re-verification of a
 // re-grounded finding defers to the sibling runner (C12, honest ceiling). No network, no models.
 
-const WITHDRAWN_SCHEMA = 'dispatch.withdrawn/v1';
-const RECEIPT_SCHEMA = 'withdrawal-receipt/v1';
+const WITHDRAWN_SCHEMA = 'dispatch.withdrawn/v2';
+const RECEIPT_SCHEMA = 'withdrawal-receipt/v2';
 // A CLOSED, machine-readable reason enum — never free text (C3; OpenVEX/CSAF/CycloneDX: a status
 // must carry a structured justification, a bare flag is non-conformant).
 const WITHDRAW_REASONS = ['fabricated', 'misattributed', 'retracted', 'verifier-flipped', 'other'];
@@ -500,17 +662,8 @@ function withdrawnPathFor(dispatch) {
   return join(dirname(dispatch), `${base}.withdrawn.json`);
 }
 
-// Recursively collect files matching a regex (skips node_modules/.git), sorted for determinism.
-function walkByExt(dir, re) {
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === '.git') continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkByExt(full, re));
-    else if (re.test(entry.name)) out.push(full);
-  }
-  return out.sort();
-}
+// Recursively collect files matching a regex (delegates to the resilient shared walker).
+function walkByExt(dir, re) { return walkFiles(dir, re); }
 
 // The finding numbers in one dispatch whose citation normalizes to `want` (reuses the lint parser,
 // so Step 3 and the compensator agree on what a citation is).
@@ -589,7 +742,7 @@ function cmdWithdraw(args) {
   const detail = f.detail ? String(f.detail) : '';
 
   const deps = findDependents(corpus, identifier);
-  if (deps.length === 0) fail(2, `no dispatch in ${corpus} cites ${identifier} (normalized: ${want}) — nothing to withdraw`);
+  if (deps.length === 0) fail(2, `no dispatch in ${corpus} cites ${identifier} (normalized: ${want}) — nothing to withdraw. Check the identifier spelling and the --from directory; "study-swarm lint ${corpus}" lists the citations the tool can see.`);
 
   const dependents = [];
   for (const d of deps) {
@@ -638,14 +791,67 @@ function cmdWithdraw(args) {
   process.stdout.write(
     `\nYou may have relied on this finding. Each flagged dispatch now HALTS "study-swarm requalify --check"\n` +
     `until the finding is removed or re-grounded — re-ground or override.\n` +
-    `Receipt ${f.receipt ? String(f.receipt) : '(stdout: pass --json)'} — receipt_sha256 ${receipt.receipt_sha256}\n`);
+    `${f.receipt ? `Receipt written to ${String(f.receipt)}` : 'No receipt file written — re-run with --receipt <path> or --json to capture it'} — receipt_sha256 ${receipt.receipt_sha256}\n`);
   process.exit(0);
 }
 
 function cmdRequalify(args) {
   if (args.includes('--check')) return requalifyCheck(args.filter((a) => a !== '--check'));
   if (args.includes('--resolve')) return requalifyResolve(args.filter((a) => a !== '--resolve'));
-  fail(2, 'usage: study-swarm requalify --check <corpus-dir>  |  study-swarm requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]');
+  if (args.includes('--status')) return requalifyStatus(args.filter((a) => a !== '--status'));
+  fail(2, 'usage: study-swarm requalify --check <corpus-dir>  |  study-swarm requalify --status <corpus-dir> [--json]  |  study-swarm requalify --resolve <dispatch> <identifier> --mode removed|regrounded [--note <text>]');
+}
+
+const STATUS_SCHEMA = 'study-swarm.status/v1';
+
+// FG-04 — the read-only evidence-health VIEW of a corpus (distinct from --check, the CI gate). Walks
+// the .withdrawn.json sidecars and aggregates: withdrawn vs resolved counts, a breakdown by reason
+// and by resolution mode, and a per-dispatch line. Informational — it never fails closed (exit 0),
+// so it composes in a report without gating a build the way --check does.
+function requalifyStatus(args) {
+  const f = parseFlags(args, new Set());
+  const corpus = f._[0];
+  if (!corpus) fail(2, 'usage: study-swarm requalify --status <corpus-dir> [--json]');
+  if (!existsSync(corpus)) fail(2, `corpus not found: ${corpus}`);
+  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i) : [corpus];
+  const totals = { withdrawn: 0, resolved: 0 };
+  const by_reason = {};
+  const by_mode = {};
+  const dispatches = [];
+  const problems = [];
+  for (const sc of sidecars) {
+    let stored;
+    try { stored = JSON.parse(readFileSync(sc, 'utf8')); }
+    catch (err) { problems.push(`${sc}: not valid JSON (${err.message})`); continue; }
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) { problems.push(`${sc}: sidecar is not a JSON object`); continue; }
+    const entries = [];
+    for (const w of stored.withdrawals || []) {
+      const status = w.status === 'resolved' ? 'resolved' : 'withdrawn';
+      totals[status] += 1;
+      if (w.reason) by_reason[w.reason] = (by_reason[w.reason] || 0) + 1;
+      const mode = status === 'resolved' && w.resolution ? w.resolution.mode : null;
+      if (mode) by_mode[mode] = (by_mode[mode] || 0) + 1;
+      entries.push({ identifier: w.identifier, reason: w.reason, status, mode, findings: w.findings || [] });
+    }
+    dispatches.push({ dispatch: stored.dispatch, sidecar: sc.split(/[\\/]/).pop(), withdrawals: entries });
+  }
+  const kv = (o) => Object.keys(o).sort().map((k) => `${k}=${o[k]}`).join(', ') || '(none)';
+  if (f.json) {
+    process.stdout.write(JSON.stringify({ schema: STATUS_SCHEMA, study_swarm_version: VERSION, corpus, totals, by_reason, by_mode, dispatches, problems }) + '\n');
+    process.exit(0);
+  }
+  process.stdout.write(`study-swarm requalify --status ${corpus}: ${dispatches.length} sidecar(s), ${totals.withdrawn + totals.resolved} withdrawal(s)\n`);
+  process.stdout.write(`  ${totals.withdrawn} unresolved (evidence-withdrawn), ${totals.resolved} resolved\n`);
+  process.stdout.write(`  by reason: ${kv(by_reason)}\n`);
+  process.stdout.write(`  by resolution mode: ${kv(by_mode)}\n`);
+  for (const d of dispatches) {
+    for (const w of d.withdrawals) {
+      const tag = w.status === 'resolved' ? `resolved: ${w.mode}` : 'withdrawn';
+      process.stdout.write(`  - ${d.dispatch}: ${w.identifier} (${w.reason}) [${tag}] findings ${(w.findings || []).map((n) => '#' + n).join(', ')}\n`);
+    }
+  }
+  for (const p of problems) process.stderr.write(`  ! ${p}\n`);
+  process.exit(0);
 }
 
 function requalifyCheck(args) {
@@ -661,6 +867,14 @@ function requalifyCheck(args) {
     let stored;
     try { stored = JSON.parse(readFileSync(sc, 'utf8')); }
     catch (err) { problems.push(`${sc}: not valid JSON (${err.message})`); continue; }
+    // A non-object sidecar (null / array / scalar) is a reportable problem, not a crash — the per-file
+    // loop keeps checking the rest of the corpus and the offending file is named (PH-01).
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+      problems.push(`${sc}: sidecar is not a JSON object`); continue;
+    }
+    // Stale-format gate — a wrong-schema sidecar is "regenerate", not a self-integrity failure (PH-04).
+    const stale = staleSchema(stored, WITHDRAWN_SCHEMA, 'sidecar', sc);
+    if (stale) { problems.push(stale); continue; }
     // Self-integrity: a hand-edited sidecar (e.g. a status forged to "resolved") fails closed.
     if (typeof stored.withdrawn_sha256 !== 'string' || stored.withdrawn_sha256 !== withSha(stored, 'withdrawn_sha256').withdrawn_sha256) {
       problems.push(`${sc}: withdrawn_sha256 self-integrity mismatch (the sidecar was hand-edited)`);
@@ -708,7 +922,7 @@ function requalifyResolve(args) {
   }
   if (mode === 'removed') {
     const still = findingsCiting(dispatch, want);
-    if (still.length) fail(1, `${dispatch} still cites ${want} (findings ${still.map((n) => '#' + n).join(', ')}) — cannot resolve --mode removed until the finding is removed; use --mode regrounded with --note <attestation> if it was re-verified in place`);
+    if (still.length) fail(1, `${dispatch} still cites ${want} (findings ${still.map((n) => '#' + n).join(', ')}) — cannot resolve --mode removed while the citation is present.\n  Two ways forward:\n    • remove the citation from the dispatch, then re-run --mode removed; or\n    • if it was re-verified in place, use --mode regrounded --note "<attestation>".`);
   } else if (mode === 'regrounded' && !f.note) {
     fail(2, '--mode regrounded requires --note <attestation> — the CLI records that the sibling runner re-verified the finding, it does not itself re-verify');
   }

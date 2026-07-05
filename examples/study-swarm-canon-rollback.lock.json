@@ -1,63 +1,63 @@
 {
-  "schema": "dispatch.lock/v1",
-  "study_swarm_version": "1.3.0",
-  "protocol_sha256": "sha256-8MW4Z/3WF+r/RUnkUc3vSASws29TsLry0OeRb5Phym4=",
-  "dispatch_sha256": "sha256-V7b/nROpdDfH6TBUDrBwcyxFwR99yihkfIaNFE5yGkk=",
+  "schema": "dispatch.lock/v2",
+  "study_swarm_version": "2.0.0",
+  "protocol_sha256": "sha256-9tVI9RrD1qKHB/j/Ec9+//Q6y5coRtOvVcfDyiH46eQ=",
+  "dispatch_sha256": "sha256-O6rba+NrJhL4s6qSzaMPgQ5hhWB7mQWD1lEIQJjOJ9I=",
   "steps": [
     {
       "question_id": "Q1-revocation-propagation",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-UM5MzdUiL88wbj+GaUsrlwiAwSffNYD6G5KcIRSFcn0=",
-      "tool_schema_sha256": "sha256-Tuyydf1fteUasUVBy+VzlGijelrqPfvHjI7wHvE9Omk=",
+      "prompt_sha256": "sha256-itBKUD1vfwbDaQFlItEbIrWRx4auszx3/MeDUggQRI4=",
+      "tool_schema_sha256": "sha256-rAn5uvRldR9ctw1Sb8ZkXIuVRzA8spJBRmFJqkAqUO0=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": {
         "effort": "high"
       },
-      "output_sha256": "sha256-utlcmvknCo6mvVE0CJSptTHKAWjAbyAccCUXlV4cuyk="
+      "output_sha256": "sha256-nIWvzFM74zz5s6DddRBXeoZXUUrn5W5YB7L9symaFXo="
     },
     {
       "question_id": "Q2-status-propagation-states",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-AY9HKlNQhdAw8Woxni4903GeG3GwItWaHLucloitZlQ=",
-      "tool_schema_sha256": "sha256-Tuyydf1fteUasUVBy+VzlGijelrqPfvHjI7wHvE9Omk=",
+      "prompt_sha256": "sha256-rLMa1hQeYobjvEeCWjmhhwjx0ZV7A/JG4xN+Gn/Taus=",
+      "tool_schema_sha256": "sha256-rAn5uvRldR9ctw1Sb8ZkXIuVRzA8spJBRmFJqkAqUO0=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": {
         "effort": "high"
       },
-      "output_sha256": "sha256-yU0hMIEGjOL7imQbLJWzXhJQze1onwHDVmPY0dKR8ow="
+      "output_sha256": "sha256-PY9+TX8amO4HEnSj2m5667eCPzSxQoJLLlRifWNjSAE="
     },
     {
       "question_id": "Q3-scholarly-retraction",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-TEeHZdUC26paRW9TSYHuiDx0Xn6olBysMIkPDDw4jXo=",
-      "tool_schema_sha256": "sha256-Tuyydf1fteUasUVBy+VzlGijelrqPfvHjI7wHvE9Omk=",
+      "prompt_sha256": "sha256-edU5+lj80xAt/lICOwERznjxy7Xavrt4zkRbHAL4lL8=",
+      "tool_schema_sha256": "sha256-rAn5uvRldR9ctw1Sb8ZkXIuVRzA8spJBRmFJqkAqUO0=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": {
         "effort": "high"
       },
-      "output_sha256": "sha256-gWAS2GsMJmkDgODKPL3tR0bX1qqc7pIh9MVevzVUkHQ="
+      "output_sha256": "sha256-ffW4pz8IyjoeRqgNHe6xTfnvo8zs9wKSCZJczG4qBTc="
     },
     {
       "question_id": "Q4-sound-compensators",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-aavKw3GRZWQPAQf3UbsptfbiOjQSLfqOoQJ9zqvQeJM=",
-      "tool_schema_sha256": "sha256-Tuyydf1fteUasUVBy+VzlGijelrqPfvHjI7wHvE9Omk=",
+      "prompt_sha256": "sha256-f2549e25ZsyA+QgebqdIeNsh3a+u/iAer+t439zh+J4=",
+      "tool_schema_sha256": "sha256-rAn5uvRldR9ctw1Sb8ZkXIuVRzA8spJBRmFJqkAqUO0=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": {
         "effort": "high"
       },
-      "output_sha256": "sha256-5ui1SfolNP+Dj4wqut/XysFeXlRD2wtlAd9cUzFgkSU="
+      "output_sha256": "sha256-e8mm2j3uOX0pUvdgMpck8OMqtvs+NG3FuVMn4LMQhDU="
     },
     {
       "question_id": "Q5-stale-tombstone-contrastive",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-4K8vxSk4rRNpH76T+dBc5pmMRqdP1nCPKahSB650cKc=",
-      "tool_schema_sha256": "sha256-Tuyydf1fteUasUVBy+VzlGijelrqPfvHjI7wHvE9Omk=",
+      "prompt_sha256": "sha256-Ml4IoYnSajRyAjaWyjrA44kdzpmDGbrSFGAPOfYUPVo=",
+      "tool_schema_sha256": "sha256-rAn5uvRldR9ctw1Sb8ZkXIuVRzA8spJBRmFJqkAqUO0=",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": {
         "effort": "high"
       },
-      "output_sha256": "sha256-0UKzfcvegCvkXik9Dq/xSW2e2kDW1LNgKaOt+omoMq8="
+      "output_sha256": "sha256-wpEjen2OeX44jBIkf50iRfY4VLQMWCcJyoiyBYq33lI="
     }
   ],
   "verification": {
@@ -74,5 +74,5 @@
     "citations_sha256": "70a0d84650477090be49925bf4b53ab52b8fdb88ebf5d2487f3000ea96fc810a",
     "receipt_chain_sha256": "dcd57fc2ec8d66992e9762e1e551aee75829dda2bf9cc0837bc3106f48cece94"
   },
-  "lock_sha256": "sha256-SwWAnYyQZdUwaI0YoLRREu063otv6yx5bqnzZT4KJa4="
+  "lock_sha256": "sha256-soRuGNSctKGPLxebfbZtCx+nA/oWtDTeFaf0TRIwYhg="
 }

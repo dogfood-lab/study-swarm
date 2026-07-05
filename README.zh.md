@@ -75,11 +75,13 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 |---|---|
 | `study-swarm protocol` | 打印完整的协议——五个步骤、停止表以及来源标准。 |
 | `study-swarm new <slug>` | 创建一个`<slug>.dispatch.md`文件，其中包含五步流程的框架，以便进行填充。 |
-| `study-swarm lint [--json] <path…>` | 根据来源标准检查工作流程的*研究扎实性*——每条研究结果都需要作者、年份和一个可解析的标识符（arXiv / DOI / URL）；“研究表明……”这种含糊其辞的方式将被拒绝。如果存在违规行为，则退出代码为`1`，以便在CI中进行筛选。`<path>`可以是文件、目录（递归地检查所有`.dispatch.md`文件），或者`-`表示标准输入；`--json`会输出机器可读的报告。 |
+| `study-swarm lint [--json] [--strict] <path…>` | 检查某个报告的“研究依据”，并对照来源标准进行验证——每个发现都需要有作者、年份和可解析的标识符（arXiv / DOI / URL / RFC）；禁止使用含糊不清的表述，例如“研究表明……”。如果存在违规情况，则返回 `1`，从而阻止 CI 流程。`<path>` 可以是文件、目录（递归地检查所有 `*.dispatch.md` 文件），或者 `-` 表示标准输入；`--json` 会输出机器可读的报告。`--strict` 还会标记“孤立引用”——即某个发现没有被任何第五步选项引用，因为“没有关联的引用是无用的”（可选功能，因此默认的 CI 流程不会改变）。 |
+| `study-swarm lock --init <dispatch>` | 生成 `<dispatch>.orchestration.json` 文件——这是一个填空式的框架记录（每个步骤对应一个第二步中的代理），用于提供给 `lock … --from` 命令。 |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | 将一个调度固定下来以便重放——编写 `<dispatch>.lock.json`，其中包含基于内容的哈希值，按照步骤 2 中的代理进行操作，包括**已解析的模型 ID** + **字节级精确提示的 SHA-256 值** + **工具模式的 SHA-256 值**，以及步骤 4 中的**验证者凭证**，并将它们组合成一个 `lock_sha256`。 |
 | `study-swarm lock --verify <dispatch> [--from …]` | 重新计算这些哈希值并确认它们与锁匹配；如果出现任何偏差，则退出并返回 1，因此它就像软件包的 lock 文件一样，可以控制 CI 流程。如果不使用 `--from` 参数，则会检查锁自身的完整性。 |
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **规范回滚补偿器。** 标记语料库中每个引用 `<id>` 作为“证据已撤回”（一个墓碑侧文件 `<slug>.withdrawn.json`——标记，永不删除）的文档，并生成基于内容的撤回凭证。 `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`。 |
 | `study-swarm requalify --check <corpus-dir>` | 对于任何带有未解决的“证据已撤回”标志的文档，执行失败安全机制（退出代码为 `1`）——这是一种“andon”（警报），它会**阻止**已撤回结论的依赖项，直到该结论被删除或重新验证。用于门控 CI。 |
+| `study-swarm requalify --status <corpus-dir> [--json]` | 以只读方式查看语料库的“证据健康状况”——包括已撤回和已解决的数量、按原因和解决方法分类，以及每个报告的行数。这是一个信息性输出（返回 `0`），与 `--check` 流程不同。 |
 | `study-swarm requalify --resolve <dispatch> <id> --mode removed\ | regrounded [--note …]` | 一旦该结论被删除（引用消失）或重新验证（由辅助运行器重新验证；`--note` 记录证明），则清除标志。幂等性；附加到侧文件的审计跟踪中。 |
 
 `lint`是确定性的——不调用任何模型——因此可以在CI中安全使用。它在本地强制执行**第3步的来源标准**；基于模型的**第4步**验证仍然依赖于[`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism。
@@ -112,11 +114,15 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      # Halt the build while any finding that became canon is withdrawn and not yet
+      # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
+      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
 ```
 
 ### 将一个调度固定下来以便重放 (`dispatch.lock.json`)
@@ -149,7 +155,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## 状态
 
-一个可工作的协议，由其自身的机制进行外部验证——不同的模型系列检查其引用（参见上面的证明）。**v1.1** 改进了验证器，而第一个版本是静默的：分解/三元验证、生成时验证、用于组合透镜的基于 oracle 的级联以及校准后的弃权——每个都基于经过验证的 v1.1 文档。**v1.2** 使文档可重放：`study-swarm lock` 为每个步骤固定已解决的模型、提示和工具模式，以及验证器凭证，并且 `lock --verify` 在检测到漂移时会失败安全。**v1.3** 使回滚操作可执行：当已经成为规范的结论被撤回时，`study-swarm withdraw` 会标记所有依赖项，并且 `requalify --check` 会阻止它们，直到它们被删除或重新验证——这是一种命名的、带有凭证的、幂等的补偿器。此仓库是公共参考；[PROTOCOL.md](PROTOCOL.md) 是可执行的形式。它是 [dogfood-lab](https://github.com/dogfood-lab) 系列的一部分——用于在人工智能时代构建的方法和示例。
+一个可行的协议，通过其自身的机制进行外部验证——不同的模型系列会检查其引用（参见上面的证明）。**v1.1** 版本改进了验证器，解决了首次发布版本中存在的不足：分解/三元依据、生成时间依据、用于组合不同视角的基于预言机的级联方法以及校准的弃权机制——所有这些都以经过验证的 v1.1 报告为基础。**v1.2** 版本使报告能够进行字节级别的重放：`study-swarm lock` 命令会固定每个步骤中已解决的模型、提示和工具模式，以及验证器收据；`lock --verify` 命令会在检测到漂移时停止流程。**v1.3** 版本使回滚操作可执行：当某个已经成为标准的事实被撤回时，`study-swarm withdraw` 命令会标记所有相关的依赖项，并且 `requalify --check` 命令会暂停这些依赖项的运行，直到它们被删除或重新验证——这是一个命名的、带有收据的、幂等的补偿器。**v2.0** 版本使协议中的更多部分可执行，并加强了锁定机制：`lint --strict` 命令会标记孤立引用——这是 CLI 无法捕获的唯一一种失败模式；`lock --init` 命令会生成框架记录；`requalify --status` 命令会读取语料库的证据健康状况；锁定的内容寻址是领域隔离的（工件模式 v2——来自早期版本的锁定会被重新生成，而不是被错误地标记为已篡改；CLI 的命令界面保持向后兼容）。此仓库是公共参考；[PROTOCOL.md](PROTOCOL.md) 是可执行的形式。它是 [dogfood-lab](https://github.com/dogfood-lab) 系列的一部分——用于构建人工智能时代的方法和示例。
 
 采用MIT许可证。
 

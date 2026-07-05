@@ -75,12 +75,14 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 |---|---|
 | `study-swarm protocol` | 完全なプロトコル（5つのステップ、停止テーブル、ソース標準）を出力します。 |
 | `study-swarm new <slug>` | 5つのステップのスケルトンを含む`<slug>.dispatch.md`を作成し、それを埋めるためのテンプレートを提供します。 |
-| `study-swarm lint [--json] <path…>` | ディスパッチの*研究根拠*をソース標準と比較してチェックします。すべての発見には、著者、年、および解決可能な識別子（arXiv / DOI / URL）が必要です。「研究によると…」という曖昧な表現は拒否されます。違反があった場合、終了コード`1`を返し、CIでゲートとして機能します。`<path>`はファイル、ディレクトリ（`.dispatch.md`ファイルを再帰的にlint）、または`-`（標準入力）のいずれかになります。`--json`オプションを使用すると、機械可読形式のレポートが出力されます。 |
+| `study-swarm lint [--json] [--strict] <path…>` | ディスパッチの「研究根拠」を、ソースの標準と比較して確認します。すべての調査結果には、著者、年、および解決可能な識別子（arXiv / DOI / URL / RFC）が必要です。「研究では～と示されています…」という曖昧な表現は認められません。違反があった場合は `1` を返して処理を停止し、CI のゲートとして機能します。`<path>` は、ファイル、ディレクトリ（`*.dispatch.md` に対して再帰的にチェックされます）、または標準入力 (`-`) にすることができます。`--json` オプションを使用すると、機械可読のレポートが出力されます。`--strict` オプションを追加すると、**孤立した引用**（Step 5 のいずれかの選択肢で参照されていない調査結果）がフラグ付けされます。「関連性のない引用はノイズである」ためです（オプションであり、デフォルトの CI ゲートは変更されません）。 |
+| `study-swarm lock --init <dispatch>` | `<dispatch>.orchestration.json` を作成します。これは、`lock … --from` に渡すための、穴埋め形式のハーネスレコードです（Step-2 のエージェントごとに1つのステップ）。 |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | ディスパッチをリプレイ用に固定します。`<dispatch>.lock.json`ファイルに、ステップ2のエージェントごとに、**解決されたモデルID** + **正確なバイト単位のプロンプトのSHA-256ハッシュ** + **ツールスキーマのSHA-256ハッシュ**、およびステップ4の**検証レシート**をまとめて書き込みます。これらを1つの`lock_sha256`にまとめます。 |
 | `study-swarm lock --verify <dispatch> [--from …]` | これらのハッシュを再計算し、ロックファイルと一致することを確認します。いずれかのハッシュが異なる場合、終了コード`1`を返し、CIでゲートとして機能します（パッケージのロックファイルと同様）。`--from`オプションがない場合は、ロックファイルの整合性をチェックします。 |
-| `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **正準ロールバック補償機能。** コーパス内のすべてのディスパッチについて、*調査根拠*が`<id>`を`証拠の撤回`として引用している場合にフラグを設定します（墓石サイドカー`<slug>.withdrawn.json`—フラグを設定し、削除は行わない）。また、コンテンツアドレス指定された撤回レシートを出力します。`--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`。 |
-| `study-swarm requalify --check <corpus-dir>` | 未解決の`証拠の撤回`フラグを持つすべてのディスパッチに対して、処理を停止（終了コード`1`で終了）します。これは、撤回された調査結果に依存する要素が削除または再検証されるまで、その処理を一時停止させるための仕組みです。CIゲートとして機能します。 |
-| `study-swarm requalify --resolve <dispatch> <id> --mode removed\ | regrounded [--note …]` | 調査結果が削除されたとき（引用がなくなったとき）または再検証されたときに、フラグをクリアします（兄弟ランナーによって再検証され、問題がないことが確認されます。`--note`にはその証拠が記録されます）。べき等性があり、サイドカーの監査ログに追加されます。 |
+| `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **カノンロールバック補正器**。コーパス内のすべてのディスパッチについて、「研究根拠」で `<id>` を引用しているものを `evidence-withdrawn` としてフラグ付けします（墓石のようなサイドカーファイル `<slug>.withdrawn.json` で、フラグを立てますが削除はしません）。また、コンテンツアドレス指定された取り下げレシートを出力します。`--reason` は `fabricated · misattributed · retracted · verifier-flipped · other` のいずれかです。 |
+| `study-swarm requalify --check <corpus-dir>` | 未解決の `evidence-withdrawn` フラグを持つディスパッチがある場合、処理を停止してエラー (`1`) を返します。これは、取り下げられた調査結果に依存するものを、削除または再検証されるまで停止させるための「アンドン」です。CI のゲートとしても機能します。 |
+| `study-swarm requalify --status <corpus-dir> [--json]` | コーパスの読み取り専用の証拠健全性**ビュー**を提供します。取り下げられたものと解決されたものの数、理由および解決モードごとの内訳、ディスパッチごとの行を表示します。これは情報提供のみを目的としており（`0` を返します）、`--check` ゲートとは異なります。 |
+| `study-swarm requalify --resolve <dispatch> <id> --mode removed\ | regrounded [--note …]` | 調査結果が削除されたとき（引用がなくなったとき）または再検証されたときに、フラグをクリアします（兄弟ランナーによって再度検証され、問題がないことが確認されます。`--note` には証拠が記録されます）。べき等であり、サイドカーの監査ログに追加されます。 |
 
 `lint`は決定論的であり、モデル呼び出しはゼロであるため、CIでの使用に安全です。ローカルで**ステップ3のソース標準**を適用し、モデルベースの**ステップ4**検証は引き続き[`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prismに委ねます。
 
@@ -93,7 +95,7 @@ study-swarm lint my-decision.dispatch.md         # enforce the sourcing standard
 roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different family, via prism)
 ```
 
-4つの完全で、lintチェックに合格したディスパッチをリファレンスとして公開します：[`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md)（プロトコルの中心的な決定事項、コンパクト）、[`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md)（完全なv1.1設計パス—27件の引用。すべて外部で検証済み）、[`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md)（v1.2ロック設計—39件の引用、ランナーを通じてゲート処理され、独自のロックを公開する最初のディスパッチ）、および[`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md)（v1.3正準ロールバック設計—撤回、取り下げ、サガ、ビルド無効化にわたる27件の引用。また、最初に撤回され、その後再検証されるディスパッチ）。
+4つの完全で、lint チェックに合格したディスパッチを参考として提供します：[`examples/study-swarm-self.dispatch.md`](examples/study-swarm-self.dispatch.md)（プロトコルの中心的な決定であり、コンパクト）、[`examples/study-swarm-v1_1.dispatch.md`](examples/study-swarm-v1_1.dispatch.md)（完全な v1.1 の設計パスであり、27件の引用があり、そのすべてが外部で検証されています）、[`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md)（v1.2 のロック設計であり、39件の引用があり、ランナーを通じてゲートされ、独自のロックを最初に提供するディスパッチです）、および [`examples/study-swarm-canon-rollback.取り消し、撤回、サガ、ビルド無効化など、27件の引用が含まれており、最初に取り下げられてから再検証されるディスパッチです）。
 
 ### CIでゲートとして使用する
 
@@ -112,11 +114,15 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      # Halt the build while any finding that became canon is withdrawn and not yet
+      # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
+      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
 ```
 
 ### ディスパッチをリプレイ用に固定する（`dispatch.lock.json`）
@@ -125,9 +131,9 @@ jobs:
 
 **入力は固定し、出力は固定しません。** モデル、プロンプト、温度を固定しても、LLMの出力が完全に同一になるわけではありません。バッチ不変性、浮動小数点演算の非結合性、混合エキスパートルーティング、およびサイレントプロバイダドリフトなど、オフラインツールで制御できない要素が存在するためです。したがって、この仕組みは、**再現可能な入力とドリフトを検出可能な出力を提供し、「決定的な再現」を実現するものではありません。** この設計は、[`examples/study-swarm-lock.dispatch.md`](examples/study-swarm-lock.dispatch.md) に記載されているように、個々の要素に基づいて構築されており、独自のロック機能を備えた最初のバージョン ([`examples/study-swarm-lock.lock.json`](examples/study-swarm-lock.lock.json)) として提供されます。
 
-### 撤回された調査結果をロールバックします（`withdraw`/`requalify`）
+### 取り下げられた調査結果をロールバックします（`withdraw` / `requalify`）
 
-検証済みの調査結果は**正準**となります。これは、後続の意思決定に影響を与えます。したがって、後で**撤回**された場合（再実行時に引用が捏造または誤って帰属されていることが判明した場合、引用された論文が取り下げられた場合、またはゲートがそれを却下した場合）どうなるでしょうか？`git revert`だけでは不十分です。なぜなら、調査結果はすでに伝播しているからです。正準ロールバック補償機能により、クリーンアップを実行できるようになります。
+検証された調査結果は**カノン**になります。これは、後続の決定に影響を与えます。では、後で**取り下げられた**場合（再実行時に引用が捏造または誤って帰属されていることが判明した場合、引用された論文が撤回された場合、またはゲートがそれを反転させた場合）はどうなるでしょうか？ `git revert` だけでは不十分です。なぜなら、調査結果はすでに伝播しているからです。カノンロールバック補正器を使用すると、クリーンアップを確実に実行できます。
 
 ```bash
 study-swarm withdraw arXiv:2402.15089 --reason misattributed --from dispatches/ --receipt rollback.json
@@ -137,7 +143,7 @@ study-swarm requalify --check dispatches/          # exit 1 while any flag is un
 study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   # or: --mode regrounded --note "<attestation>"
 ```
 
-`requalify --check`は、フラグが設定されたすべての調査結果が削除または**再検証**されるまで、処理を停止します（兄弟ランナーによって再検証され、問題がないことが確認されます。CLIは証拠を記録しますが、それ自体で再検証は行いません）。撤回は**対照的**に表示され、サイレントな削除とはなりません。すべて—墓石とレシート—はコンテンツアドレス指定されており、ドリフト検出が可能であり、*証拠*レイヤーでのみ動作します：`lock --verify`は撤回によって影響を受けません。この設計は[`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md)に基づいており、[PROTOCOL.md](PROTOCOL.md)の§「撤回された調査結果を補償する」が実行可能な形式です。これは、**NAMED_COMPENSATORS**標準を実行可能にしたものです：名前付きでべき等なアンドゥ処理であり、既知のポスト状態とレシートを残します。
+`requalify --check` は、フラグが立てられたすべての調査結果が削除されるか、**再検証されるまで**（兄弟ランナーによって再度検証され、問題がないことが確認されます。CLI は証拠を記録しますが、それ自体で再検証は行いません）、**処理を停止してエラーを返します**。取り下げは、静かにドロップするのではなく、**対照的に**表示されます。すべて（墓石とレシート）がコンテンツアドレス指定され、ドリフト検出が可能であり、*証拠* レイヤーでのみ動作します：`lock --verify` は取り消しによって影響を受けません。この設計は [`examples/study-swarm-canon-rollback.dispatch.md`](examples/study-swarm-canon-rollback.dispatch.md) に基づいており、[PROTOCOL.md](PROTOCOL.md) の「Compensating a withdrawn finding」セクションが実行可能な形式です。これは、**NAMED_COMPENSATORS** 標準を実行可能にしたものです。名前付きでべき等なアンドゥ操作であり、既知のポスト状態とレシートを残します。
 
 ## その仕組みを簡潔に説明します
 
@@ -149,7 +155,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## ステータス
 
-独自のメカニズムによって外部検証された、動作するプロトコル—別のモデルファミリーがその引用をチェックします（上記の証拠を参照）。**v1.1**は、最初のリリースではサイレントだった検証機能を強化しました：分解/三値の根拠付け、生成時の根拠付け、レンズを組み合わせるためのオラクルゲート付きカスケード、および調整された棄権—それぞれが検証済みのv1.1ディスパッチに基づいて行われます。**v1.2**は、ディスパッチをバイト単位で再現可能にします：`study-swarm lock`は、各ステップと検証レシートごとに解決されたモデル、プロンプト、およびツールスキーマを固定し、`lock --verify`はドリフトが発生した場合に処理を停止します。**v1.3**は、ロールバックを実行可能にします：すでに正準となった調査結果が撤回されると、`study-swarm withdraw`はすべての依存関係にフラグを設定し、`requalify --check`はそれらを削除または再検証されるまで処理を停止します—名前付きで、レシート付きの、べき等な補償機能です。このリポジトリは公開リファレンスであり、[PROTOCOL.md](PROTOCOL.md)が実行可能な形式です。[dogfood-lab](https://github.com/dogfood-lab)ファミリーの一部であり、AI時代におけるビルドのための方法とショーケースを提供します。
+独自のメカニズムによって外部検証された動作するプロトコルです。別のモデルファミリーがその引用をチェックします（上記の証拠を参照）。**v1.1** では、最初のリリースでは静的だった検証器が強化されています：分解/三値の根拠付け、生成時の根拠付け、レンズを組み合わせるためのオラクルゲート付きカスケード、および調整された棄権。これらはすべて、検証済みの v1.1 ディスパッチに基づいています。**v1.2** では、ディスパッチがバイト単位で再現可能になります：`study-swarm lock` は、ステップごとの解決済みモデル、プロンプト、ツールスキーマと、検証器レシートを固定します。また、`lock --verify` はドリフトが発生すると処理を停止してエラーを返します。**v1.3** では、ロールバックを実行可能にします：すでにカノンになった調査結果が取り下げられた場合、`study-swarm withdraw` はすべての依存関係にフラグを立て、`requalify --check` はそれらを削除または再検証されるまで処理を停止してエラーを返します。これは、名前付きでレシート付きのべき等な補正器です。**v2.0** では、プロトコルのより多くの部分を実行可能にし、ロックを強化します：`lint --strict` は孤立した引用にフラグを立てます（CLI が検出できなかった唯一の失敗モード）、`lock --init` はハーネスレコードを作成し、`requalify --status` はコーパスの証拠健全性を読み取り、ロックのコンテンツアドレス指定はドメインで分離されます（アーティファクトスキーマ v2。以前のバージョンのロックは再生成され、改ざんされたと誤ってフラグが立てられることはありません。CLI のコマンドサーフェスは後方互換性を維持します）。このリポジトリは公開参照であり、[PROTOCOL.md](PROTOCOL.md) が実行可能な形式です。これは、[dogfood-lab](https://github.com/dogfood-lab) ファミリーの一部であり、AI 時代に構築するための方法とデモンストレーションを提供します。
 
 MITライセンス。
 
