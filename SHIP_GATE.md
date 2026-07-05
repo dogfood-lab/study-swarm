@@ -19,7 +19,7 @@
 ### Default safety posture
 
 - [x] `[cli]` No dangerous actions — CLI has no kill/delete/restart; `new` writes one file and refuses to overwrite (2026-06-02)
-- [x] `[cli]` File operations constrained — `lint` reads only; `new` writes `<slug>.dispatch.md` in cwd, never overwrites (2026-06-02)
+- [x] `[cli]` File operations constrained — `lint` reads only; `new` writes a sanitized `<slug>.dispatch.md` in cwd, never overwrites; `lock`/`withdraw`/`requalify` read the artifacts you name and write lock/sidecar/receipt JSON at the paths you supply (2026-07-05)
 - [ ] `[mcp]` SKIP: not an MCP server
 - [ ] `[mcp]` SKIP: not an MCP server
 

@@ -103,7 +103,7 @@ Example: *"Retry uses a fresh prompt without the previous output. (sycophancy mi
 
 **A citation includes ALL of:** (1) author(s) — first author + "et al." inline is fine; (2) year; (3) a **resolvable identifier or direct URL** — an arXiv id (arXiv:NNNN.NNNNN), a DOI, an RFC number, or a direct link to the source (not a summary or a social-media thread); a paper title is welcome but optional; (4) a one-sentence key finding in your own words.
 
-> `study-swarm lint` enforces exactly this FORM locally — author + year + a resolvable arXiv/DOI/URL, and no "studies show…" gestures. arXiv ids and DOIs are preferred over a bare URL because Step 4's retrieval oracle resolves them deterministically.
+> `study-swarm lint` enforces exactly this FORM locally — author + year + a resolvable arXiv/DOI/URL/RFC, and no "studies show…" gestures. arXiv ids and DOIs are preferred over a bare URL because Step 4's retrieval oracle resolves them deterministically.
 
 **Not allowed:** "studies show…" / "research suggests…" / "it's well-established…" without naming the source; an identifier-less citation; citations the research step did not actually surface.
 

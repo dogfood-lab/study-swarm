@@ -31,12 +31,14 @@ jobs:
         run: |
           # Node 22 bundles npm 10.x, which cannot do OIDC trusted publishing,
           # and an in-place `npm i -g npm@latest` races its own arborist rebuild.
-          # Install npm@latest into an isolated sandbox and shadow it via PATH.
+          # Install a PINNED npm (>=11.5.1 is the OIDC-TP floor) into an isolated sandbox and
+          # shadow it via PATH. Pinned, not @latest, so this publish step is reproducible and
+          # can't be broken by a bad npm release floating in at tag time.
           SANDBOX="$HOME/.npm-cli-sandbox"
           mkdir -p "$SANDBOX"
           pushd "$SANDBOX" >/dev/null
           echo '{"name":"npm-cli-sandbox","version":"0.0.0","private":true}' > package.json
-          npm install --no-save --no-audit --no-fund --silent npm@latest
+          npm install --no-save --no-audit --no-fund --silent 'npm@^11.5.1'
           popd >/dev/null
           echo "$SANDBOX/node_modules/.bin" >> "$GITHUB_PATH"
           "$SANDBOX/node_modules/.bin/npm" --version
@@ -54,8 +56,26 @@ jobs:
       - name: Smoke-test the CLI
         run: node scripts/smoke.mjs
 
-      - name: npm pack dry-run (verify shape)
-        run: npm pack --dry-run
+      - name: Verify the PACKED tarball is runnable (gates a files-allowlist regression)
+        run: |
+          set -euo pipefail
+          # Pack, extract OUTSIDE the repo, and run the runtime-file-dependent commands against
+          # ONLY the shipped files. A working-tree smoke test and `npm pack --dry-run` both pass
+          # even if package.json "files" drops a runtime-required file (PROTOCOL.md, examples/);
+          # this step fails closed on that, so the published tarball is proven runnable.
+          npm pack
+          TARBALL=$(ls -t ./*.tgz | head -1)
+          WORK=$(mktemp -d)
+          tar -xzf "$TARBALL" -C "$WORK"
+          PKG="$WORK/package"
+          node "$PKG/bin/study-swarm.mjs" version
+          node "$PKG/bin/study-swarm.mjs" protocol | grep -q "Step 1"                     # reads shipped PROTOCOL.md
+          node "$PKG/bin/study-swarm.mjs" lint "$PKG/examples/study-swarm-self.dispatch.md"  # examples/ shipped
+          node "$PKG/bin/study-swarm.mjs" lock --verify \
+            "$PKG/examples/study-swarm-lock.dispatch.md" \
+            --from "$PKG/examples/study-swarm-lock.orchestration.json"                     # lock + PROTOCOL.md
+          rm -f "$TARBALL"
+          echo "OK: packed tarball is runnable from its shipped files only"
 
       - name: Publish to npm with provenance (OIDC trusted publisher)
         run: npm publish --provenance --access public

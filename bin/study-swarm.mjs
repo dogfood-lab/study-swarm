@@ -47,12 +47,13 @@ COMMANDS
   version                  Print the version.
 
 EXIT CODES
-  0  ok / lint clean
-  1  lint found sourcing violations
+  0  ok / lint clean / verify clean
+  1  a gate failed: a lint sourcing violation, lock --verify drift, or an
+     unresolved evidence-withdrawn flag (requalify --check)
   2  usage or runtime error
 
 NOTE
-  lint checks citation FORM (Step 3: author + year + a resolvable arXiv/DOI/URL,
+  lint checks citation FORM (Step 3: author + year + a resolvable arXiv/DOI/URL/RFC,
   no "studies show…" gestures) — it does not judge whether a source is legitimate
   or actually supports the claim. That is Step 4, below.
 
@@ -135,14 +136,22 @@ function cmdNew(slug) {
 // --- lint core ------------------------------------------------------------
 
 const YEAR = /\b(19|20)\d{2}\b/;
-const ID = /(arxiv:\s*\d{4}\.\d{4,5}|10\.\d{4,9}\/\S+|https?:\/\/\S+)/i;
+// A resolvable identifier: an arXiv id, a DOI, a direct URL, or a bare RFC number
+// (RFC parity keeps `lint` in step with the sourcing standard and with normIdent, which
+// already treats `RFC NNNN` as first-class in withdraw/requalify).
+const ID = /(arxiv:\s*\d{4}\.\d{4,5}|10\.\d{4,9}\/\S+|https?:\/\/\S+|\brfc[\s/-]?\d{3,5}\b)/i;
 const PLACEHOLDER = /arXiv:_{2,}|<finding>|<authors>|<year>|<implication>/i;
 const BANNED = /\b(studies show|research suggests|it'?s well[- ]established|well[- ]established that)\b/i;
 // An author cite: a capitalized name (Unicode-aware, so "Buçinca" counts), optionally
 // followed by "et al.", "&", "and", or further surnames, immediately before the year.
-// Accepts "Huang et al. 2023", "Walters & Wilder 2023", "Panickssery, Bowman & Feng 2024";
+// Accepts "Huang et al. 2023", "Walters & Wilder 2023", "Panickssery, Bowman & Feng 2024",
+// and space-separated org authors ("OASIS CSAF Technical Committee 2022");
 // flags an author-less finding like "**Foo.** 2024 (arXiv:…)".
-const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:\s*,?\s*(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+))*\s+\(?(?:19|20)\d{2}/u;
+// The inner group requires a non-empty separator per iteration (`,?\s+`, never the old
+// empty-matchable `\s*,?\s*`) and is bounded ({0,24}), so it is linear-time — the previous
+// form had catastrophic backtracking (ReDoS) on a long capitalized/`and`-joined run with no
+// trailing year, hanging the CI-gating `lint` command.
+const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:,?\s+(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+)){0,24}\s+\(?(?:19|20)\d{2}/u;
 
 // Check one dispatch's text. Returns a structured result; never exits.
 function lintText(label, raw) {
@@ -186,13 +195,15 @@ function lintText(label, raw) {
   findings.forEach((f, i) => {
     const n = i + 1;
     if (PLACEHOLDER.test(f.text)) add('placeholder', `finding ${n}: still has template placeholders — fill it in.`, f.line, n);
-    // Strip identifiers before the year check so an arXiv id's YYMM prefix
-    // (e.g. 2402 in arXiv:2402.01817) can't masquerade as a publication year.
-    const fNoIds = f.text.replace(/arxiv:\s*\d{4}\.\d{4,5}/gi, '').replace(/10\.\d{4,9}\/\S+/g, '');
+    // Strip identifiers before the year check so digits inside a citation can't masquerade
+    // as a publication year: an arXiv id's YYMM prefix (e.g. 2402 in arXiv:2402.01817), a DOI,
+    // or a year-like URL path segment (e.g. /2024/ in https://host/2024/paper). URLs are
+    // stripped first so a DOI-bearing URL is removed whole.
+    const fNoIds = f.text.replace(/https?:\/\/\S+/gi, '').replace(/arxiv:\s*\d{4}\.\d{4,5}/gi, '').replace(/10\.\d{4,9}\/\S+/g, '');
     if (!YEAR.test(fNoIds)) add('missing-year', `finding ${n}: missing a year (spell it out, e.g. "2024" — an arXiv id alone is not a year).`, f.line, n);
     if (!AUTHOR.test(f.text)) add('missing-author', `finding ${n}: missing an author before the year (e.g. "Huang et al. 2023").`, f.line, n);
     const idm = f.text.match(ID);
-    if (!idm) add('missing-id', `finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, or URL).`, f.line, n);
+    if (!idm) add('missing-id', `finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, URL, or RFC number).`, f.line, n);
     const ym = fNoIds.match(YEAR);
     const ident = idm ? idm[0].replace(/\s+/g, '').replace(/[).,;]+$/, '') : null;
     parsed.push({ finding: n, year: ym ? ym[0] : null, identifier: ident });
@@ -584,8 +595,13 @@ function cmdWithdraw(args) {
   for (const d of deps) {
     const body = loadSidecar(d.path);
     const existing = body.withdrawals.find((w) => w.identifier === want);
-    // Idempotent: an identical withdrawal (same id + reason + detail, still withdrawn) is a no-op.
-    const identical = existing && existing.status === 'withdrawn' && existing.reason === String(f.reason) && (existing.detail || '') === detail;
+    // Idempotent: an identical withdrawal (same id + reason + detail + finding numbers, still
+    // withdrawn) is a no-op. The findings array is part of the identity so that re-withdrawing
+    // after the dispatch was edited (a citation moved to a different finding #) refreshes the
+    // stale numbers instead of being skipped as "identical".
+    const sameFindings = existing && Array.isArray(existing.findings) &&
+      existing.findings.length === d.findings.length && existing.findings.every((v, i) => v === d.findings[i]);
+    const identical = existing && existing.status === 'withdrawn' && existing.reason === String(f.reason) && (existing.detail || '') === detail && sameFindings;
     if (!identical) {
       if (existing) {
         existing.reason = String(f.reason); existing.detail = detail; existing.status = 'withdrawn'; existing.resolution = null; existing.findings = d.findings;

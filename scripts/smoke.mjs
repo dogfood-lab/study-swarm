@@ -69,6 +69,14 @@ try {
     if (existsSync(join(work, 'escape.dispatch.md'))) throw new Error('escaped to parent directory!');
   });
   check('new rejects a pure-dots slug (exit 2)', () => eq(run(['new', '..'], { cwd: work }).code, 2, 'exit'));
+  check('new sanitizes a path-separator slug to a hyphen and confines the file to cwd', () => {
+    const d = join(work, 'sanitize'); mkdirSync(d, { recursive: true });
+    const r = run(['new', 'a/b'], { cwd: d });
+    eq(r.code, 0, 'exit');
+    if (!existsSync(join(d, 'a-b.dispatch.md'))) throw new Error('expected a-b.dispatch.md in cwd');
+    if (existsSync(join(d, 'a', 'b.dispatch.md'))) throw new Error('created a nested path instead of confining to cwd');
+    if (!/slug sanitized to "a-b"/.test(r.stdout)) throw new Error('missing the "slug sanitized to" note');
+  });
 
   // --- lint: the sourcing gate ---
   const lintFile = (name, body) => { const p = join(work, name); writeFileSync(p, body); return p; };
@@ -178,6 +186,51 @@ try {
     if (!obj.findings.length) throw new Error('no findings parsed');
     for (const f of obj.findings) if (!f.identifier) throw new Error(`finding ${f.finding} has no resolvable identifier`);
   });
+  // ReDoS guard: the AUTHOR regex must be linear-time. A long capitalized/`and`-joined author
+  // run with no trailing year is the catastrophic-backtracking input; it must lint (exit 1 for the
+  // malformed finding) FAST, not hang the CI-gating command.
+  check('lint does not catastrophically backtrack on a long author run (ReDoS guard, exit 1, fast)', () => {
+    const many = Array.from({ length: 40 }, () => 'Word').join(' and ');
+    const p = lintFile('redos.dispatch.md', `# d\n\n## Research grounding\n1. **A finding** ${many} with no year here.\n`);
+    const t0 = Date.now();
+    const r = run(['lint', p], { timeout: 8000 });
+    const ms = Date.now() - t0;
+    eq(r.code, 1, 'exit');
+    if (ms > 4000) throw new Error(`lint took ${ms}ms on a long author run — possible catastrophic backtracking`);
+  });
+  check('lint flags a finding with an author + year but no identifier (missing-id, exit 1)', () => {
+    const p = lintFile('noid.dispatch.md', '# d\n\n## Research grounding\n1. **A finding.** Huang et al. 2023. No identifier here.\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    if (!JSON.parse(r.stdout).problems.some((x) => x.rule === 'missing-id')) throw new Error('expected a missing-id rule id');
+  });
+  check('lint flags a present-but-empty Research grounding section (no-findings, exit 1)', () => {
+    const p = lintFile('emptysection.dispatch.md', '# d\n\n## Research grounding\n\n## Next section\ntext\n');
+    const r = run(['lint', p]);
+    eq(r.code, 1, 'exit');
+    if (!/no numbered findings/.test(r.stderr)) throw new Error('expected "no numbered findings"');
+  });
+  check('lint accepts a bare RFC number as a resolvable identifier (exit 0)', () => {
+    const p = lintFile('rfc.dispatch.md', '# d\n\n## Research grounding\n1. **A finding.** Cooper et al. 2008 (RFC 5280). Implication.\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint does not accept a URL path segment as a year (missing-year, exit 1, year not leaked)', () => {
+    const p = lintFile('urlyear.dispatch.md', '# d\n\n## Research grounding\n1. **A finding by Smith and colleagues.** (https://example.org/2019/paper). Implication.\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (!obj.problems.some((x) => x.rule === 'missing-year')) throw new Error('expected missing-year');
+    if (obj.findings[0].year !== null) throw new Error(`URL digits leaked into parsed year: ${obj.findings[0].year}`);
+  });
+  check('lint --json on multiple files emits the {ok,files} wrapper (exit 1)', () => {
+    const a = lintFile('mf-good.dispatch.md', '# a\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    const b = lintFile('mf-bad.dispatch.md', '# b\n\n## Research grounding\n1. **F.** 2024 (arXiv:2310.01798).\n');
+    const r = run(['lint', '--json', a, b]);
+    eq(r.code, 1, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (obj.ok !== false || !Array.isArray(obj.files) || obj.files.length !== 2) throw new Error('bad multi-file {ok,files} wrapper');
+    if (typeof obj.files[0].ok !== 'boolean') throw new Error('per-file ok flag missing');
+  });
 
   // --- lock: dispatch.lock.json (the PIN_PER_STEP feature) ---
   const lockDir = join(work, 'lockdir'); mkdirSync(lockDir, { recursive: true });
@@ -199,6 +252,19 @@ try {
     writeFixtures(baseOrch());
     eq(run(['lock', dPath]).code, 2, 'exit');
   });
+  check('lock --from a missing orchestration file exits 2', () => {
+    writeFixtures(baseOrch());
+    const r = run(['lock', dPath, '--from', join(lockDir, 'nope.json')]);
+    eq(r.code, 2, 'exit');
+    if (!/orchestration record not found/.test(r.stderr)) throw new Error('wrong message');
+  });
+  check('lock --from an invalid-JSON orchestration exits 2', () => {
+    writeFixtures(baseOrch());
+    const bad = join(lockDir, 'bad-orch.json'); writeFileSync(bad, 'not json{');
+    const r = run(['lock', dPath, '--from', bad]);
+    eq(r.code, 2, 'exit');
+    if (!/not valid JSON/.test(r.stderr)) throw new Error('wrong message');
+  });
   check('lock builds a lock.json (exit 0) pinning model + prompt + tool-schema + output hashes', () => {
     const r = run(['lock', dPath, '--from', orchPath]);
     eq(r.code, 0, 'exit');
@@ -213,6 +279,9 @@ try {
     if (s.resolved_model !== 'claude-opus-4-8') throw new Error('resolved_model not pinned');
   });
   check('lock build is deterministic (same inputs -> same lock_sha256)', () => {
+    // Hermetic: build both locks inside this check so `first` never depends on state a prior
+    // check happened to leave on disk (a reorder or an intervening fixture edit could stale it).
+    buildClean();
     const first = JSON.parse(readFileSync(lockJsonPath, 'utf8')).lock_sha256;
     buildClean();
     const second = JSON.parse(readFileSync(lockJsonPath, 'utf8')).lock_sha256;
@@ -425,6 +494,44 @@ try {
     const exD = resolve(__dirname, '../examples/study-swarm-canon-rollback.dispatch.md');
     const exO = resolve(__dirname, '../examples/study-swarm-canon-rollback.orchestration.json');
     eq(run(['lock', '--verify', exD, '--from', exO]).code, 0, 'exit');
+  });
+  check('requalify --resolve on an identifier with no flag exits 2', () => {
+    const c = join(work, 'req-noflag'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    const r = run(['requalify', '--resolve', join(c, 'a.dispatch.md'), 'arXiv:1111.22222', '--mode', 'removed']);
+    eq(r.code, 2, 'exit');
+    if (!/no evidence-withdrawn flag/.test(r.stderr)) throw new Error('wrong message');
+  });
+  check('requalify --check on a single unresolved sidecar FILE exits 1 (single-file RED path)', () => {
+    const c = join(work, 'req-single'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    eq(run(['requalify', '--check', join(c, 'a.withdrawn.json')]).code, 1, 'single-file RED');
+  });
+  check('requalify --check with no corpus arg exits 2', () => eq(run(['requalify', '--check']).code, 2, 'exit'));
+  check('requalify --check on a nonexistent corpus exits 2', () => eq(run(['requalify', '--check', join(work, 'no-such-dir')]).code, 2, 'exit'));
+  // Guards the idempotency fix: an identical re-withdraw after the citation MOVED to a different
+  // finding number must refresh the stored numbers, not be skipped as a stale no-op.
+  check('re-withdraw after a citation moved refreshes the finding numbers', () => {
+    const c = join(work, 'moved'); mkdirSync(c, { recursive: true });
+    const dp = join(c, 'a.dispatch.md');
+    writeFileSync(dp, '# a\n\n## Research grounding\n1. **First.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n2. **Shared.** Zhu et al. 2024 (' + FIND_ID + '). Impl.\n');
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    if (JSON.stringify(readJson(join(c, 'a.withdrawn.json')).withdrawals[0].findings) !== '[2]') throw new Error('expected finding #2 initially');
+    writeFileSync(dp, '# a\n\n## Research grounding\n1. **Shared.** Zhu et al. 2024 (' + FIND_ID + '). Impl.\n'); // citation now #1
+    run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]); // same id+reason+detail, moved position
+    const got = JSON.stringify(readJson(join(c, 'a.withdrawn.json')).withdrawals[0].findings);
+    if (got !== '[1]') throw new Error(`stale finding numbers not refreshed: ${got}`);
+  });
+  check('withdraw --json emits the full receipt shape (schema, reason, dependents)', () => {
+    const c = join(work, 'wd-shape'); mkdirSync(c, { recursive: true });
+    writeFileSync(join(c, 'a.dispatch.md'), '# a\n\n' + GROUND(FIND_ID));
+    const obj = JSON.parse(run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c, '--json']).stdout);
+    if (obj.schema !== 'withdrawal-receipt/v1') throw new Error('bad schema');
+    if (obj.reason !== 'retracted') throw new Error('reason field missing');
+    if (!Array.isArray(obj.dependents) || obj.dependents.length !== 1) throw new Error('dependents wrong');
+    if (!obj.dependents[0].dispatch || !Array.isArray(obj.dependents[0].findings)) throw new Error('dependent shape wrong');
   });
 } finally {
   rmSync(work, { recursive: true, force: true });

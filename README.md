@@ -75,7 +75,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 |---|---|
 | `study-swarm protocol` | Print the full protocol — the five steps, the halt table, the sourcing standard. |
 | `study-swarm new <slug>` | Scaffold a `<slug>.dispatch.md` with the five-step skeleton to fill in. |
-| `study-swarm lint [--json] <path…>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
+| `study-swarm lint [--json] <path…>` | Check a dispatch's *Research grounding* against the sourcing standard — every finding needs an author, a year, and a resolvable identifier (arXiv / DOI / URL / RFC); "studies show…" hand-waving is rejected. Exit `1` on violations, so it gates CI. A `<path>` may be a file, a directory (linted recursively for `*.dispatch.md`), or `-` for stdin; `--json` emits a machine-readable report. |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | Pin a dispatch for replay — write `<dispatch>.lock.json` content-addressing, per Step-2 agent, the **resolved model id** + the **SHA-256 of the byte-exact prompt** + the **SHA-256 of the tool schema**, plus the Step-4 **verifier receipt**, rolled into one `lock_sha256`. |
 | `study-swarm lock --verify <dispatch> [--from …]` | Re-derive those hashes and assert they match the lock; any drift exits `1`, so it gates CI like a package lockfile. Without `--from`, checks the lock's own integrity. |
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **Canon-rollback compensator.** Flag every dispatch in the corpus whose *Research grounding* cites `<id>` as `evidence-withdrawn` (a tombstone sidecar `<slug>.withdrawn.json` — flag, never delete) and emit a content-addressed withdrawal receipt. `--reason` ∈ `fabricated · misattributed · retracted · verifier-flipped · other`. |
@@ -112,11 +112,15 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      # Halt the build while any finding that became canon is withdrawn and not yet
+      # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
+      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
 ```
 
 ### Pin a dispatch for replay (`dispatch.lock.json`)
