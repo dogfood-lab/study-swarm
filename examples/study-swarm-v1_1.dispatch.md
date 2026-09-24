@@ -7,7 +7,7 @@
 > Every citation below was gated through Step 4 (retrieval oracle for existence + two different-family
 > groundedness lenses, reasoning-stripped) **before** it informed the architecture. The synthesizer is
 > Claude/Opus; the verifier families are Mistral + IBM Granite + the deterministic arXiv oracle — none of
-> them Claude. Run `study-swarm lint study-swarm-v1_1.dispatch.md` (it passes).
+> them Claude. Run `study-swarm lint examples/study-swarm-v1_1.dispatch.md` (it passes).
 
 ## Step 1 — Load-bearing questions
 

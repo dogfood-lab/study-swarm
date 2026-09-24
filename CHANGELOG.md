@@ -24,6 +24,7 @@ All notable changes to this project are documented here. The format is based on 
 - Translated READMEs keep the heading `Research grounding`. That English phrase is what `lint` and `withdraw` match. A gloss sits beside it.
 - The lock example's `dispatch_sha256` and `prompt_sha256` lines name the same preimage as `protocol_sha256`: the tag `study-swarm/v2/text`, a newline, then the normalized text.
 - `withdraw` refuses a hand-edited tombstone instead of re-hashing it, and an identical re-withdraw leaves the file untouched. An `arxiv.org/html/` URL is the same identifier as `arXiv:NNNN.NNNNN`. A Step 5 heading is one that starts with "Step 5", or whose text is exactly "Architecture".
+- After `withdraw`, the next step names `--mode removed` and `--mode regrounded`. There is no `--mode override`. The worked examples' lint lines use the `examples/` path that passes from the repo root.
 - A subheading inside Research grounding does not end the section. A trailing slash on a DOI URL is the same identifier as the bare DOI. `question_id`, `schema_dialect`, `params`, and `verification` are rejected when the type is wrong, not coerced or dropped. `requalify --resolve` refuses a hand-edited sidecar. A null withdrawal entry is a named problem, not a crash. The release workflow does not cancel an in-progress npm publish.
 
 ## [2.0.0] — 2026-07-05

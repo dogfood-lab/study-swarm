@@ -9,7 +9,7 @@
 > parallel retrieval-grounded research agents; every finding below was fetched this session, and the whole
 > set is gated through Step 4 (`roleos verify-citations` → prism, a different model family) **before** it
 > informs the architecture. The synthesizer is Claude/Opus; the groundedness lens is Mistral; the existence
-> oracle is deterministic retrieval — none of them Claude. Run `study-swarm lint study-swarm-lock.dispatch.md`
+> oracle is deterministic retrieval — none of them Claude. Run `study-swarm lint examples/study-swarm-lock.dispatch.md`
 > (it passes).
 
 ## Step 1 — Load-bearing questions

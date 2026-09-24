@@ -625,7 +625,7 @@ try {
     const rcp = join(c, 'receipt.json');
     const w = run(['withdraw', FIND_ID, '--reason', 'misattributed', '--detail', 'Fang -> Zhu', '--from', c, '--receipt', rcp]);
     eq(w.code, 0, 'withdraw exit');
-    if (!/you may have relied/i.test(w.stdout) || !/re-ground or override/i.test(w.stdout)) throw new Error('withdraw output is not contrastive');
+    if (!/you may have relied/i.test(w.stdout) || !/--mode removed/.test(w.stdout) || !/--mode regrounded/.test(w.stdout)) throw new Error('withdraw output does not name the two resolve modes');
     if (!existsSync(join(c, 'alpha.withdrawn.json')) || !existsSync(join(c, 'beta.withdrawn.json'))) throw new Error('both sidecars not written');
     const receipt = readJson(rcp);
     if (receipt.dependents.length !== 2) throw new Error(`receipt should name 2 dependents, got ${receipt.dependents.length}`);

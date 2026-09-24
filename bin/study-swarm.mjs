@@ -922,7 +922,7 @@ function cmdWithdraw(args) {
   for (const d of dependents) process.stdout.write(`  - ${d.dispatch} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
   process.stdout.write(
     `\nYou may have relied on this finding. Each flagged dispatch now HALTS "study-swarm requalify --check"\n` +
-    `until the finding is removed or re-grounded — re-ground or override.\n` +
+    `until you clear it: delete the citation and re-run requalify --resolve --mode removed, or re-run --mode regrounded --note "<attestation>".\n` +
     `${f.receipt ? `Receipt written to ${String(f.receipt)}` : 'No receipt file written — re-run with --receipt <path> or --json to capture it'} — receipt_sha256 ${receipt.receipt_sha256}\n`);
   process.exit(0);
 }
@@ -1034,7 +1034,7 @@ function requalifyCheck(args) {
     process.exit(0);
   }
   process.stderr.write(`x requalify --check ${corpus}: ${halts.length} unresolved evidence-withdrawn flag(s) — HALT\n`);
-  for (const h of halts) process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it; re-ground or override.\n`);
+  for (const h of halts) process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it. Clear it with requalify --resolve --mode removed after the citation is gone, or --mode regrounded --note "<attestation>".\n`);
   for (const p of problems) process.stderr.write(`  - ${p}\n`);
   process.exit(1);
 }

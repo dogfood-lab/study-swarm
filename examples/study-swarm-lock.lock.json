@@ -1,8 +1,8 @@
 {
   "schema": "dispatch.lock/v2",
   "study_swarm_version": "2.0.0",
-  "protocol_sha256": "sha256-lvZr34oLyNGy5saT8oMhKvzAJysm7MrR3kkL0n7yUaY=",
-  "dispatch_sha256": "sha256-QkCwQPjvkQCOtsmbp/BnU+zAw4HsXLkIiT7EXx8b1so=",
+  "protocol_sha256": "sha256-p9LMoGfOGIASHIfFo6RkgpiCtnHlTtxcuPsTzQ+fuYY=",
+  "dispatch_sha256": "sha256-OLbenEn4TkhWu679FDvCw9940CkPeSRQol88sAVIB68=",
   "steps": [
     {
       "question_id": "Q1-replay-manifest",
@@ -58,5 +58,5 @@
     "receipt_signature": "272c892124e3bc13a76b2674fa361b1d65aee6a588c74604cf4ae4e7c9440a8ba7888175b9ec1286fe87490121f694f64cd30adc3ffc0e1b31cd3365b7b38901",
     "receipt_chain_sha256": "499b63905064a5e25fd1801c5530504c94742f2183c4d3c8eb545a20cfbb112e"
   },
-  "lock_sha256": "sha256-J5+ULZsPQw1yOXpC9V0WcCqMCwp0TJoo7lYsCu5SOG0="
+  "lock_sha256": "sha256-ctSZ/C6dgKtWNdKJE0uKV2XHqp3LeDlATOWP//Dehxc="
 }
