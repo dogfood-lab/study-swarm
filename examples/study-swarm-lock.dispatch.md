@@ -95,13 +95,13 @@ Each choice traces to findings by number. The shape:
 {
   "schema": "dispatch.lock/v2",
   "study_swarm_version": "2.0.0",
-  "protocol_sha256": "sha256-<base64 of the text-normalized PROTOCOL.md>",
-  "dispatch_sha256": "sha256-<base64 of the text-normalized dispatch>",
+  "protocol_sha256": "sha256-<base64 of the tag study-swarm/v2/text plus a newline, then the text-normalized PROTOCOL.md>",
+  "dispatch_sha256": "sha256-<base64 of that same tag plus the text-normalized dispatch>",
   "steps": [
     {
       "question_id": "Q1-replay-manifest",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-<base64>",
+      "prompt_sha256": "sha256-<base64 of that same tag plus the text-normalized prompt>",
       "tool_schema_sha256": "sha256-<base64>",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": { "effort": "high" },
@@ -122,9 +122,9 @@ Each choice traces to findings by number. The shape:
 
 - **L1 — One lock per dispatch; the lock IS the dispatch's content-address.** `lock_sha256` binds every per-step record and the verifier block together, so a replay cannot stitch a step from one dispatch onto another — the per-step record carries exactly PROV's minimal lineage quadruple (input hashes, output hashes, actor, rollup link). (findings 4, 13, 17, 18, 25)
 - **L2 — The harness emits the record; the CLI canonicalizes + hashes + validates it.** This producer/verifier split is universal across the provenance literature, and it is what keeps the CLI zero-dependency, network-free, and deterministic — it never calls a model. (findings 17, 19, 21, 22)
-- **L3 — Hash the prompt as normalized text, not JCS-restructured JSON.** The prompt is the literal string the model conditioned on, so it is hashed directly rather than canonicalized as JSON (the JWS/DSSE hash-known-bytes rule) — under one necessary text normalization (BOM strip + CRLF→LF + NFC), without which the same prompt hashes differently across platforms. (findings 12, 23; 10, 11)
+- **L3 — Hash the prompt as the domain tag plus normalized text.** The preimage is the tag `study-swarm/v2/text`, a newline, then the prompt after BOM strip, CRLF→LF, and NFC. Hashing the normalized prompt alone does not match `prompt_sha256`. The dispatch text and PROTOCOL.md use that same preimage. The prompt is not re-parsed as JSON. (findings 12, 23; 10, 11)
 - **L4 — Normalize every text input before hashing (BOM strip + CRLF→LF + NFC), and JCS-canonicalize the structured JSON (tool surface, lock body).** This is the only way the same dispatch hashes identically on Windows, macOS, and Linux — the prompt, the dispatch text, `PROTOCOL.md`, and every JSON string value all pass through it. (findings 9, 10, 11) *(CI caught a real CRLF drift here when an early build hashed raw `PROTOCOL.md` bytes — the fix is exactly this normalization, and a line-ending-invariance test now guards it.)*
-- **L5 — Capture the tool surface as the canonicalized array `{name, description, inputSchema, outputSchema}` plus the effective JSON Schema dialect.** Neither MCP nor the provider APIs ship a per-tool version or hash, so the lock's content hash is the missing drift detector, and the dialect is part of the contract; each captured schema is validated well-formed before hashing, so the lock pins a schema the run could actually have used. (findings 7, 33, 34, 35, 36, 37)
+- **L5 — Capture the tool surface as the canonicalized array `{name, description, inputSchema, outputSchema}` plus the effective JSON Schema dialect.** Neither MCP nor the provider APIs ship a per-tool version or hash, so the lock's content hash is the missing drift detector, and the dialect is part of the contract. The CLI requires `tool_schema` to be a JSON object and hashes its canonical form. It does not evaluate that object as a JSON Schema. (findings 7, 33, 34, 35, 36, 37)
 - **L6 — Pin the RESOLVED model id, never an alias.** A named model can be re-tuned server-side; the concrete platform identity is what makes a step replayable. (findings 19, 29)
 - **L7 — `output_sha256` records outputs for DRIFT DETECTION, not determinism.** Pinning model + prompt + temperature does not yield bit-identical outputs (batch-invariance, FP non-associativity, MoE routing, provider drift), so the honest claim is **"replayable inputs + drift-detectable outputs,"** never "deterministic replay." (findings 8, 19, 26, 27, 28, 30, 31, 32)
 - **L8 — `lock --verify` is fail-closed strict-match.** Re-derive every deterministic hash and assert equality; any mismatch — and any unrecognized field — exits non-zero, never auto-heals — the cache-invalidation rule that any change to a folded input re-executes rather than serving a stale hit. (findings 2, 5, 6, 20, 38)
@@ -134,4 +134,4 @@ Each choice traces to findings by number. The shape:
 
 **Optional actionable drift output (design note, not a numbered citation):** beyond a flipped SHA, `lock --verify` may classify *what* changed in the tool surface (added tool = additive, removed/renamed parameter = breaking), mirroring the breaking/non-breaking split that the [oasdiff](https://github.com/oasdiff/oasdiff) OpenAPI differ surfaces in CI. This is a usability layer over the authoritative hash check, not a substitute for it.
 
-**Net:** the lock turns a study-swarm dispatch into a content-addressed, byte-replayable manifest — resolved model + prompt + tool-schema + verifier receipt pinned per step, rolled into one `lock_sha256`, drift-checked fail-closed — while telling the truth about its ceiling: it makes inputs replayable and outputs drift-detectable, not LLM outputs deterministic.
+**Net:** the lock turns a study-swarm dispatch into a content-addressed manifest — resolved model + prompt + tool-schema + verifier receipt pinned per step, rolled into one `lock_sha256`, drift-checked fail-closed — while telling the truth about its ceiling: it makes inputs replayable and outputs drift-detectable, not LLM outputs deterministic.

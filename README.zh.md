@@ -106,7 +106,7 @@ roleos verify-citations my-decision.dispatch.md  # model-based Step 4 (different
 name: study-swarm lint
 on:
   pull_request:
-    paths: ['**/*.dispatch.md', '.github/workflows/dispatches.yml']
+    paths: ['**/*.dispatch.md', '**/*.withdrawn.json', '.github/workflows/dispatches.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

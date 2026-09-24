@@ -10,7 +10,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel an in-progress publish. A killed npm publish can leave the
+  # version public while the run is cancelled, and that version cannot be republished.
+  cancel-in-progress: false
 
 jobs:
   release:

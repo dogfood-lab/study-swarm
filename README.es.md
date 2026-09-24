@@ -106,7 +106,7 @@ Cuatro envíos completos y limpios sirven como referencia: [`examples/study-swar
 name: study-swarm lint
 on:
   pull_request:
-    paths: ['**/*.dispatch.md', '.github/workflows/dispatches.yml']
+    paths: ['**/*.dispatch.md', '**/*.withdrawn.json', '.github/workflows/dispatches.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

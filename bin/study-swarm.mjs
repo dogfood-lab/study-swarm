@@ -201,17 +201,32 @@ function referencedNumbers(body) {
   }
   return nums;
 }
-// The Step-5 / Architecture section body (last matching heading → next heading/EOF), or null.
+function headingLevel(line) {
+  const m = /^(#{1,6})\s/.exec(line);
+  return m ? m[1].length : 0;
+}
+// A section runs until the next heading of the same or higher level. A ### inside ## stays inside.
+function sectionEnd(lines, start) {
+  const level = headingLevel(lines[start]) || 6;
+  for (let i = start + 1; i < lines.length; i++) {
+    const lv = headingLevel(lines[i]);
+    if (lv && lv <= level) return i;
+  }
+  return lines.length;
+}
+function isStep5Heading(text) {
+  const t = String(text || '').trim();
+  return /step\s*5/i.test(t) || /^architecture\b/i.test(t);
+}
+// The Step-5 / Architecture section body (last real Step 5 heading → next same-or-higher heading), or null.
 function step5Body(lines) {
   let s = -1;
   for (let i = 0; i < lines.length; i++) {
     const h = lines[i].match(/^#{1,6}\s+(.*?)\s*$/);
-    if (h && /(step\s*5|architecture)/i.test(h[1])) s = i;
+    if (h && isStep5Heading(h[1])) s = i;
   }
   if (s === -1) return null;
-  let e = lines.length;
-  for (let i = s + 1; i < lines.length; i++) { if (/^#{1,6}\s/.test(lines[i])) { e = i; break; } }
-  return lines.slice(s + 1, e).join('\n');
+  return lines.slice(s + 1, sectionEnd(lines, s)).join('\n');
 }
 
 // Check one dispatch's text. Returns a structured result; never exits. `strict` adds the Step-5
@@ -232,10 +247,7 @@ function lintText(label, raw, strict) {
     add('no-section', 'no "Research grounding" section found — every dispatch needs one (Step 3).');
     return { file: label, ok: false, findingCount: 0, problems, findings: [] };
   }
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (/^#{1,6}\s/.test(lines[i])) { end = i; break; }
-  }
+  const end = sectionEnd(lines, start);
   const section = lines.slice(start + 1, end);
 
   // Split into findings (numbered items + continuation lines), ignoring fenced code blocks
@@ -519,14 +531,28 @@ function buildLockObject(dispatchPath, orchestration) {
     const prompt = need('prompt');
     if (typeof model !== 'string' || !model.trim()) fail(2, `orchestration step ${i + 1} resolved_model must be a non-empty string`);
     if (typeof prompt !== 'string') fail(2, `orchestration step ${i + 1} prompt must be a string`);
+    const qid = need('question_id');
+    if (typeof qid !== 'string' || !qid.trim()) fail(2, `orchestration step ${i + 1} question_id must be a non-empty string`);
     const rec = {
-      question_id: String(need('question_id')),
+      question_id: qid,
       resolved_model: model,                                 // L6 — the resolved id, never an alias
       prompt_sha256: sriText(prompt),                       // L3 — text-normalized (LF/NFC/BOM), not JCS-restructured
-      tool_schema_sha256: jcsDigest(need('tool_schema')),   // L5 — canonicalized tool surface
+      tool_schema_sha256: (() => {
+        const schema = need('tool_schema');
+        if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+          fail(2, `orchestration step ${i + 1} tool_schema must be a JSON object`);
+        }
+        return jcsDigest(schema);
+      })(),
     };
-    if (s.schema_dialect) rec.schema_dialect = String(s.schema_dialect); // L5 — dialect is contract
-    if (s.params && typeof s.params === 'object') rec.params = s.params;
+    if (s.schema_dialect !== undefined) {
+      if (typeof s.schema_dialect !== 'string' || !s.schema_dialect.trim()) fail(2, `orchestration step ${i + 1} schema_dialect must be a non-empty string`);
+      rec.schema_dialect = s.schema_dialect;
+    }
+    if (s.params !== undefined) {
+      if (!s.params || typeof s.params !== 'object' || Array.isArray(s.params)) fail(2, `orchestration step ${i + 1} params must be a JSON object`);
+      rec.params = s.params;
+    }
     // L7 — output hash for DRIFT DETECTION only (not determinism). The harness may ship the raw
     // output (the CLI hashes it) OR a pre-computed output_sha256 (large outputs needn't be shipped).
     // A caller-supplied digest is validated to the SRI sha256- shape here, so a malformed hash is
@@ -553,8 +579,10 @@ function buildLockObject(dispatchPath, orchestration) {
     dispatch_sha256: sriText(dispatchText),  // pins the dispatch text (text-normalized)
     steps,
   };
-  if (orchestration.verification && typeof orchestration.verification === 'object') {
-    lock.verification = orchestration.verification; // L10 — the external-verifier receipt
+  if (orchestration.verification !== undefined) {
+    const v = orchestration.verification;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) fail(2, 'orchestration verification must be a JSON object');
+    lock.verification = v; // L10 — the external-verifier receipt
   }
   // L1/L9 — rollup over the whole body (this object, before lock_sha256 is added) as ONE flat
   // canonical object: distinct keys give domain separation, the steps array's explicit length
@@ -732,7 +760,7 @@ function normIdent(raw) {
   let m = s.match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/) || s.match(/arxiv:\s*(\d{4}\.\d{4,5})/);
   if (m) return 'arxiv:' + m[1];
   m = s.match(/(?:doi\.org\/|dx\.doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)/);
-  if (m) return 'doi:' + cleanIdent(m[1]).toLowerCase();
+  if (m) return 'doi:' + cleanIdent(m[1]).toLowerCase().replace(/\/+$/, '');
   m = s.match(/rfc[\s/-]?(\d{3,5})/);
   if (m) return 'rfc:' + m[1];
   return s.replace(/\/+$/, '');
@@ -923,6 +951,7 @@ function requalifyStatus(args) {
     if (!stored || typeof stored !== 'object' || Array.isArray(stored)) { problems.push(`${sc}: sidecar is not a JSON object`); continue; }
     const entries = [];
     for (const w of stored.withdrawals || []) {
+      if (!w || typeof w !== 'object') { problems.push(`${sc}: a withdrawals entry is not an object`); continue; }
       const status = w.status === 'resolved' ? 'resolved' : 'withdrawn';
       totals[status] += 1;
       if (w.reason) by_reason[w.reason] = (by_reason[w.reason] || 0) + 1;
@@ -980,6 +1009,7 @@ function requalifyCheck(args) {
       problems.push(`${sc}: withdrawn_sha256 self-integrity mismatch (the sidecar was hand-edited)`);
     }
     for (const w of stored.withdrawals || []) {
+      if (!w || typeof w !== 'object') { problems.push(`${sc}: a withdrawals entry is not an object`); continue; }
       if (w.status === 'withdrawn') halts.push({ sidecar: sc.split(/[\\/]/).pop(), dispatch: stored.dispatch, identifier: w.identifier, reason: w.reason, findings: w.findings });
       else if (w.status === 'resolved') resolvedCount += 1;
     }
@@ -1013,7 +1043,11 @@ function requalifyResolve(args) {
   let body;
   try { body = JSON.parse(readFileSync(scPath, 'utf8')); }
   catch (err) { fail(2, `cannot read sidecar ${scPath}: ${err && err.code ? err.code : err.message}`); }
-  const entry = (body.withdrawals || []).find((w) => w.identifier === want);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) fail(2, `sidecar is not a JSON object: ${scPath}`);
+  if (typeof body.withdrawn_sha256 !== 'string' || body.withdrawn_sha256 !== withSha(body, 'withdrawn_sha256').withdrawn_sha256) {
+    fail(1, `${scPath}: withdrawn_sha256 self-integrity mismatch (the sidecar was hand-edited). Refusing to resolve it.`);
+  }
+  const entry = (body.withdrawals || []).find((w) => w && w.identifier === want);
   if (!entry) fail(2, `no evidence-withdrawn flag for ${identifier} (normalized: ${want}) on ${dispatch}`);
 
   if (entry.status === 'resolved') { // Idempotent: re-resolving is a no-op, no new audit entry (C7).
