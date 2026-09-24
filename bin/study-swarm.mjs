@@ -58,8 +58,9 @@ COMMANDS
 
 EXIT CODES
   0  ok / lint clean / verify clean
-  1  a gate failed: a lint sourcing violation, lock --verify drift, or an
-     unresolved evidence-withdrawn flag (requalify --check)
+  1  a gate failed: a lint sourcing violation, lock --verify drift, or
+     requalify --check (an unresolved evidence-withdrawn flag, or a sidecar
+     the check could not trust)
   2  usage or runtime error
 
 NOTE
@@ -114,7 +115,7 @@ const template = (slug, stamp) => `<!-- ${stamp} -->
 
 ## Step 4 — External verification
 <!-- Different model family, reasoning-stripped. Run:  roleos verify-citations ${slug}.dispatch.md
-     HALT on fabricated/misattributed; halt-and-escalate if the verifier or oracle is unavailable. -->
+     Drop a fabricated citation; correct a misattribution once and re-verify; halt-and-escalate only if the verifier or oracle is unavailable. -->
 - [ ] every citation resolved by retrieval (arXiv/DOI), not model memory
 - [ ] every finding matches what its source actually claims (groundedness)
 - [ ] >= 3 decorrelated lenses (retrieval oracle + >= 2 different model families)
@@ -446,7 +447,8 @@ function cmdLint(args) {
     );
   } else {
     // Symmetry with the clean-path nudge: tell the user what to do next (H1).
-    process.stderr.write(`\nFix the issue(s) above, then re-run study-swarm lint. (This checks Step 3 sourcing FORM${strict ? ' + Step 5 connections' : ''} only.)\n`);
+    const again = ['study-swarm', 'lint', ...(strict ? ['--strict'] : []), ...paths].join(' ');
+    process.stderr.write(`\nFix the issue(s) above, then re-run ${again}.\n(This checks Step 3 sourcing FORM${strict ? ' + Step 5 connections' : ''} only.)\n`);
   }
   process.exit(anyFail ? 1 : 0);
 }
@@ -567,7 +569,10 @@ function buildLockObject(dispatchPath, orchestration) {
         fail(2, `orchestration step ${i + 1} output_sha256 is not a sha256 digest of 32 bytes: "${s.output_sha256}"`);
       }
       if (hashed !== null && hashed !== s.output_sha256) {
-        fail(2, `orchestration step ${i + 1} output_sha256 does not match the output bytes`);
+        const preimage = typeof s.output === 'string'
+          ? 'the text-normalized digest under study-swarm/v2/text (BOM stripped, newlines folded to LF, NFC), not a raw SHA-256 of the output bytes'
+          : 'the canonical-JSON digest under study-swarm/v2/jcs';
+        fail(2, `orchestration step ${i + 1} output_sha256 does not match ${preimage}. Recomputed ${hashed}.`);
       }
       rec.output_sha256 = s.output_sha256;
     } else if (hashed !== null) rec.output_sha256 = hashed;
@@ -769,6 +774,12 @@ function normIdent(raw) {
 
 // The tombstone sits beside its dispatch: <dir>/<stem>.withdrawn.json (C4 — status travels WITH
 // the artifact, the OCSP-stapling property; stem strips a trailing .dispatch.md).
+function openableDispatch(sidecarPath, storedName) {
+  const name = String(storedName || '');
+  if (!name) return sidecarPath;
+  if (name.includes('/') || name.includes('\\')) return name;
+  return join(dirname(sidecarPath), name);
+}
 function withdrawnPathFor(dispatch) {
   const base = dispatch.split(/[\\/]/).pop().replace(/(\.dispatch)?\.md$/i, '');
   return join(dirname(dispatch), `${base}.withdrawn.json`);
@@ -865,7 +876,7 @@ function cmdWithdraw(args) {
   const detail = f.detail ? String(f.detail) : '';
 
   const deps = findDependents(corpus, identifier);
-  if (deps.length === 0) fail(2, `no dispatch in ${corpus} cites ${identifier} (normalized: ${want}) — nothing to withdraw. Check the identifier spelling and the --from directory; "study-swarm lint ${corpus}" lists the citations the tool can see.`);
+  if (deps.length === 0) fail(2, `no dispatch in ${corpus} cites ${identifier} (normalized: ${want}) — nothing to withdraw. Check the identifier spelling and the --from directory. "study-swarm lint --json ${corpus}" lists the identifiers the parser saw (findings[].identifiers).`);
 
   const dependents = [];
   for (const d of deps) {
@@ -894,9 +905,9 @@ function cmdWithdraw(args) {
       body.version += 1;
       body.audit_trail.push({ seq: body.audit_trail.length + 1, event: 'withdraw', identifier: want, reason: String(f.reason), findings: d.findings });
       const finalized = writeSidecar(d.path, body);
-      dependents.push({ dispatch: finalized.dispatch, dispatch_sha256: finalized.dispatch_sha256, findings: d.findings, sidecar: withdrawnPathFor(d.path).split(/[\\/]/).pop() });
+      dependents.push({ dispatch: finalized.dispatch, path: d.path, dispatch_sha256: finalized.dispatch_sha256, findings: d.findings, sidecar: withdrawnPathFor(d.path).split(/[\\/]/).pop() });
     } else {
-      dependents.push({ dispatch: body.dispatch, dispatch_sha256: body.dispatch_sha256, findings: d.findings, sidecar: sidePath.split(/[\\/]/).pop() });
+      dependents.push({ dispatch: body.dispatch, path: d.path, dispatch_sha256: body.dispatch_sha256, findings: d.findings, sidecar: sidePath.split(/[\\/]/).pop() });
     }
   }
 
@@ -907,7 +918,7 @@ function cmdWithdraw(args) {
     reason: String(f.reason),
     detail,
     corpus: corpus.split(/[\\/]/).pop() || corpus,
-    dependents,
+    dependents: dependents.map(({ path: _path, ...rest }) => rest),
     post_rollback_state: `${dependents.length} dependent(s) flagged evidence-withdrawn; "study-swarm requalify --check" fails closed until each is removed or re-grounded.`,
   }, 'receipt_sha256');
 
@@ -919,7 +930,7 @@ function cmdWithdraw(args) {
   }
   // Contrastive surfacing — never a silent drop (C10; Buçinca 2024, Bansal 2021).
   process.stdout.write(`Withdrew ${want} (reason: ${f.reason}). ${dependents.length} dependent(s) flagged evidence-withdrawn:\n`);
-  for (const d of dependents) process.stdout.write(`  - ${d.dispatch} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
+  for (const d of dependents) process.stdout.write(`  - ${d.path || d.dispatch} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
   process.stdout.write(
     `\nYou may have relied on this finding. Each flagged dispatch now HALTS "study-swarm requalify --check"\n` +
     `until you clear it: delete the citation and re-run requalify --resolve --mode removed, or re-run --mode regrounded --note "<attestation>".\n` +
@@ -969,7 +980,7 @@ function requalifyStatus(args) {
       if (mode) by_mode[mode] = (by_mode[mode] || 0) + 1;
       entries.push({ identifier: w.identifier, reason: w.reason, status, mode, findings: w.findings || [] });
     }
-    dispatches.push({ dispatch: stored.dispatch, sidecar: sc.split(/[\\/]/).pop(), withdrawals: entries });
+    dispatches.push({ dispatch: openableDispatch(sc, stored.dispatch), sidecar: sc, withdrawals: entries });
   }
   const kv = (o) => Object.keys(o).sort().map((k) => `${k}=${o[k]}`).join(', ') || '(none)';
   if (f.json) {
@@ -1020,7 +1031,7 @@ function requalifyCheck(args) {
     }
     for (const w of stored.withdrawals || []) {
       if (!w || typeof w !== 'object') { problems.push(`${sc}: a withdrawals entry is not an object`); continue; }
-      if (w.status === 'withdrawn') halts.push({ sidecar: sc.split(/[\\/]/).pop(), dispatch: stored.dispatch, identifier: w.identifier, reason: w.reason, findings: w.findings });
+      if (w.status === 'withdrawn') halts.push({ sidecar: sc, dispatch: openableDispatch(sc, stored.dispatch), identifier: w.identifier, reason: w.reason, findings: w.findings });
       else if (w.status === 'resolved') resolvedCount += 1;
     }
   }
@@ -1033,7 +1044,8 @@ function requalifyCheck(args) {
     process.stdout.write(`ok ${corpus}: no unresolved evidence-withdrawn flags (${resolvedCount} resolved).\n`);
     process.exit(0);
   }
-  process.stderr.write(`x requalify --check ${corpus}: ${halts.length} unresolved evidence-withdrawn flag(s) — HALT\n`);
+  if (halts.length) process.stderr.write(`x requalify --check ${corpus}: ${halts.length} unresolved evidence-withdrawn flag(s) — HALT\n`);
+  else process.stderr.write(`x requalify --check ${corpus}: ${problems.length} problem(s) — the check could not trust the corpus\n`);
   for (const h of halts) process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it. Clear it with requalify --resolve --mode removed after the citation is gone, or --mode regrounded --note "<attestation>".\n`);
   for (const p of problems) process.stderr.write(`  - ${p}\n`);
   process.exit(1);
