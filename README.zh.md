@@ -76,6 +76,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm protocol` | 打印完整的协议——五个步骤、停止表以及来源标准。 |
 | `study-swarm new <slug>` | 创建一个`<slug>.dispatch.md`文件，其中包含五步流程的框架，以便进行填充。 |
 | `study-swarm lint [--json] [--strict] <path…>` | 检查某个报告的*Research grounding*（研究依据），并对照来源标准进行验证——每个发现都需要有作者、年份和可解析的标识符（arXiv / DOI / URL / RFC）；禁止使用含糊不清的表述，例如“研究表明……”。如果存在违规情况，则返回 `1`，从而阻止 CI 流程。`<path>` 可以是文件、目录（递归地检查所有 `*.dispatch.md` 文件），或者 `-` 表示标准输入；`--json` 会输出机器可读的报告。`--strict` 还会标记“孤立引用”——即某个发现没有被任何第五步选项引用，因为“没有关联的引用是无用的”（可选功能，因此默认的 CI 流程不会改变）。 |
+| `study-swarm return <dispatch> [--check]` | 写出结果：`<stem>.results.md` 是交给人的一页，`<stem>.results.json` 把同样的事实留在 dispatch 旁边给下一次运行打开。`--check` 在任一副本与 dispatch 不一致时失败。 |
 | `study-swarm lock --init <dispatch>` | 生成 `<dispatch>.orchestration.json` 文件——这是一个填空式的框架记录（每个步骤对应一个第二步中的代理），用于提供给 `lock … --from` 命令。 |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | 将一个调度固定下来以便重放——编写 `<dispatch>.lock.json`，其中包含基于内容的哈希值，按照步骤 2 中的代理进行操作，包括**已解析的模型 ID** + **文本规范化提示的 SHA-256（去掉 BOM，换行折成 LF，NFC）** + **工具模式的 SHA-256 值**，以及步骤 4 中的**验证者凭证**，并将它们组合成一个 `lock_sha256`。 |
 | `study-swarm lock --verify <dispatch> [--from …]` | 重新计算这些哈希值并确认它们与锁匹配；如果出现任何偏差，则退出并返回 1，因此它就像软件包的 lock 文件一样，可以控制 CI 流程。如果不使用 `--from` 参数，则会检查锁自身的完整性。 |

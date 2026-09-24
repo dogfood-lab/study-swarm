@@ -76,6 +76,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm protocol` | 完全なプロトコル（5つのステップ、停止テーブル、ソース標準）を出力します。 |
 | `study-swarm new <slug>` | 5つのステップのスケルトンを含む`<slug>.dispatch.md`を作成し、それを埋めるためのテンプレートを提供します。 |
 | `study-swarm lint [--json] [--strict] <path…>` | ディスパッチの「Research grounding」（研究根拠）を、ソースの標準と比較して確認します。すべての調査結果には、著者、年、および解決可能な識別子（arXiv / DOI / URL / RFC）が必要です。「研究では～と示されています…」という曖昧な表現は認められません。違反があった場合は `1` を返して処理を停止し、CI のゲートとして機能します。`<path>` は、ファイル、ディレクトリ（`*.dispatch.md` に対して再帰的にチェックされます）、または標準入力 (`-`) にすることができます。`--json` オプションを使用すると、機械可読のレポートが出力されます。`--strict` オプションを追加すると、**孤立した引用**（Step 5 のいずれかの選択肢で参照されていない調査結果）がフラグ付けされます。「関連性のない引用はノイズである」ためです（オプションであり、デフォルトの CI ゲートは変更されません）。 |
+| `study-swarm return <dispatch> [--check]` | 結果を書き出します。`<stem>.results.md` は渡すシート、`<stem>.results.json` は同じ内容を dispatch の横に残す記録です。`--check` はどちらかが dispatch からずれると失敗します。 |
 | `study-swarm lock --init <dispatch>` | `<dispatch>.orchestration.json` を作成します。これは、`lock … --from` に渡すための、穴埋め形式のハーネスレコードです（Step-2 のエージェントごとに1つのステップ）。 |
 | `study-swarm lock <dispatch> --from <orchestration.json>` | ディスパッチをリプレイ用に固定します。`<dispatch>.lock.json`ファイルに、ステップ2のエージェントごとに、**解決されたモデルID** + **テキスト正規化したプロンプトのSHA-256（BOM除去、改行をLF、NFC）** + **ツールスキーマのSHA-256ハッシュ**、およびステップ4の**検証レシート**をまとめて書き込みます。これらを1つの`lock_sha256`にまとめます。 |
 | `study-swarm lock --verify <dispatch> [--from …]` | これらのハッシュを再計算し、ロックファイルと一致することを確認します。いずれかのハッシュが異なる場合、終了コード`1`を返し、CIでゲートとして機能します（パッケージのロックファイルと同様）。`--from`オプションがない場合は、ロックファイルの整合性をチェックします。 |
