@@ -89,9 +89,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.1.0 lint dispatches/
       # The canon-rollback andon: halt while any withdrawn finding is unresolved.
-      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.1.0 requalify --check dispatches/
 ```
 
 The handoff to Step 4 is the dispatch format itself: a finding written `N. **finding.** Authors year (arXiv|DOI). implication.` — one resolvable identifier per finding — is exactly what `roleos verify-citations` extracts and gates. A `lint`-clean dispatch hands off cleanly.

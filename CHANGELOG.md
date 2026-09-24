@@ -2,7 +2,11 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.1.0] — 2026-09-24
+
+### Added
+
+- `study-swarm return <dispatch>` writes `<stem>.results.md`, the sheet you hand someone, and `<stem>.results.json`, the same facts kept beside the dispatch. `return --check` fails if either copy has drifted. The command row is in every README.
 
 ### Fixed
 
@@ -15,9 +19,9 @@ All notable changes to this project are documented here. The format is based on 
 - `withdraw` and `requalify --resolve` rewrite a sidecar to schema `dispatch.withdrawn/v2` before hashing it, so a resolved v1 sidecar does not stay permanently red.
 - Help, the lock template, the README, and PROTOCOL.md call the prompt digest text-normalized (BOM stripped, newlines folded to LF, NFC), which is what the hasher does.
 - The canon-rollback example no longer states Hsiao & Schneider 2021 as a finding. The pinned run recorded `retrieved: false`. The paper is real; it is not canon in a dispatch whose own evidence did not retrieve it.
-- The lock example's shape sample shows schema v2. The sample CI workflow pins `@dogfood-lab/study-swarm@2.0.0` instead of `@latest`. The release workflow installs `npm@11.5.1` exactly.
+- The lock example's shape sample shows schema v2. The sample CI workflow pins `@dogfood-lab/study-swarm@2.1.0` instead of `@latest`. The release workflow installs `npm@11.5.1` exactly.
 - SECURITY.md reports issues on GitHub and lists the lock, tombstone, and receipt writes. The handbook halt table and three broken handbook links match the protocol. SHIP_GATE's exit code 1 includes lock drift and `requalify --check`.
-- The landing page, the handbook, and the README CI recipe use the same prompt-hash wording and the same `@2.0.0` pin as the shipped sample. Translated security sections name the lock, tombstone, and receipt writes. SECURITY.md lists 2.x as the supported line.
+- The landing page, the handbook, and the README CI recipe use the same prompt-hash wording and the same `@2.1.0` pin as the shipped sample. Translated security sections name the lock, tombstone, and receipt writes. SECURITY.md lists 2.x as the supported line.
 - A markdown-wrapped DOI or URL is the same identifier as the bare form, so `withdraw` and `requalify --resolve --mode removed` still see it. A function-word year is rejected in any case, and a real author later in the same finding still counts. An unclosed fence fails those compensator commands instead of looking like the citation is gone. A non-string `output_sha256` is rejected.
 - The five-step list drops a fabricated finding and corrects a misattribution once. Halt-and-escalate is only when the verifier or the oracle is unavailable. Spanish, Portuguese, and Hindi `--reason` values are the English tokens the CLI accepts, with a gloss beside them. Translated lock rows call the prompt digest text-normalized.
 - The sample CI workflow, and the copies in the README and handbook, also run `requalify --check` when a pull request only touches a `.withdrawn.json`. The lock example states the digest preimage as the `study-swarm/v2/text` tag plus the normalized text. `tool_schema` must be a JSON object. The symlink smoke check fails if the link cannot be created, instead of passing.
@@ -29,7 +33,6 @@ All notable changes to this project are documented here. The format is based on 
 - A failed lint repeats the command that failed, including `--strict` and the paths. `requalify --check` prints the dispatch path `--resolve` can open, and it does not call a sidecar problem an evidence-withdrawn flag. A lock digest mismatch names the text-normalized or canonical-JSON preimage. `new` tells the reader to drop a fabricated citation and correct a misattribution once.
 - `withdraw` and `requalify --check` print a full `requalify --resolve <dispatch> <identifier>` command for each flag, for both `--mode removed` and `--mode regrounded`. A resolve line that omits those two operands exits 2.
 - The landing protocol card shows `<dispatch>` in the verify command. The handbook home says the pin is a text-normalized prompt hash.
-- `study-swarm return <dispatch>` writes `<stem>.results.md`, the sheet you hand someone, and `<stem>.results.json`, the same facts kept beside the dispatch. `return --check` fails if either copy has drifted. The same command row is in every translated README.
 - A subheading inside Research grounding does not end the section. A trailing slash on a DOI URL is the same identifier as the bare DOI. `question_id`, `schema_dialect`, `params`, and `verification` are rejected when the type is wrong, not coerced or dropped. `requalify --resolve` refuses a hand-edited sidecar. A null withdrawal entry is a named problem, not a crash. The release workflow does not cancel an in-progress npm publish.
 
 ## [2.0.0] — 2026-07-05
