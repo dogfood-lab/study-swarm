@@ -216,7 +216,8 @@ function sectionEnd(lines, start) {
 }
 function isStep5Heading(text) {
   const t = String(text || '').trim();
-  return /step\s*5/i.test(t) || /^architecture\b/i.test(t);
+  // The section title, not a later note that mentions the words.
+  return /^step\s*5\b/i.test(t) || /^architecture$/i.test(t);
 }
 // The Step-5 / Architecture section body (last real Step 5 heading → next same-or-higher heading), or null.
 function step5Body(lines) {
@@ -757,7 +758,7 @@ function cleanIdent(raw) {
 }
 function normIdent(raw) {
   let s = cleanIdent(raw).toLowerCase();
-  let m = s.match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/) || s.match(/arxiv:\s*(\d{4}\.\d{4,5})/);
+  let m = s.match(/arxiv\.org\/(?:abs|pdf|html)\/(\d{4}\.\d{4,5})/) || s.match(/arxiv:\s*(\d{4}\.\d{4,5})/);
   if (m) return 'arxiv:' + m[1];
   m = s.match(/(?:doi\.org\/|dx\.doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)/);
   if (m) return 'doi:' + cleanIdent(m[1]).toLowerCase().replace(/\/+$/, '');
@@ -869,7 +870,14 @@ function cmdWithdraw(args) {
   const dependents = [];
   for (const d of deps) {
     const body = loadSidecar(d.path);
-    const existing = body.withdrawals.find((w) => w.identifier === want);
+    const sidePath = withdrawnPathFor(d.path);
+    if (existsSync(sidePath)) {
+      if (!body || typeof body !== 'object' || Array.isArray(body)) fail(2, `sidecar is not a JSON object: ${sidePath}`);
+      if (typeof body.withdrawn_sha256 !== 'string' || body.withdrawn_sha256 !== withSha(body, 'withdrawn_sha256').withdrawn_sha256) {
+        fail(1, `${sidePath}: withdrawn_sha256 self-integrity mismatch (the sidecar was hand-edited). Refusing to withdraw over it.`);
+      }
+    }
+    const existing = (body.withdrawals || []).find((w) => w && w.identifier === want);
     // Idempotent: an identical withdrawal (same id + reason + detail + finding numbers, still
     // withdrawn) is a no-op. The findings array is part of the identity so that re-withdrawing
     // after the dispatch was edited (a citation moved to a different finding #) refreshes the
@@ -885,9 +893,11 @@ function cmdWithdraw(args) {
       }
       body.version += 1;
       body.audit_trail.push({ seq: body.audit_trail.length + 1, event: 'withdraw', identifier: want, reason: String(f.reason), findings: d.findings });
+      const finalized = writeSidecar(d.path, body);
+      dependents.push({ dispatch: finalized.dispatch, dispatch_sha256: finalized.dispatch_sha256, findings: d.findings, sidecar: withdrawnPathFor(d.path).split(/[\\/]/).pop() });
+    } else {
+      dependents.push({ dispatch: body.dispatch, dispatch_sha256: body.dispatch_sha256, findings: d.findings, sidecar: sidePath.split(/[\\/]/).pop() });
     }
-    const finalized = writeSidecar(d.path, body);
-    dependents.push({ dispatch: finalized.dispatch, dispatch_sha256: finalized.dispatch_sha256, findings: d.findings, sidecar: withdrawnPathFor(d.path).split(/[\\/]/).pop() });
   }
 
   const receipt = withSha({

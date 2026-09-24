@@ -158,6 +158,15 @@ try {
     if (obj.findingCount !== 2) throw new Error('subheading hid a finding');
     if (!obj.problems.some((x) => x.rule === 'banned-gesture')) throw new Error('gesture under the subheading was not checked');
   });
+  check('lint --strict does not treat a later "Notes on step 5" heading as the connection', () => {
+    const body = '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n\n## Step 5 — Architecture\n- **C1.** no citation here.\n\n## Notes on step 5\nHuang 2023 is mentioned.\n';
+    eq(run(['lint', '--strict', lintFile('notestep.dispatch.md', body)]).code, 1, 'exit');
+  });
+  check('withdraw matches an arxiv.org/html URL to the bare id', () => {
+    const d = join(work, 'arxivhtml'); mkdirSync(d);
+    writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (https://arxiv.org/html/2402.15089). Impl.\n');
+    eq(run(['withdraw', 'arXiv:2402.15089', '--reason', 'retracted', '--from', d]).code, 0, 'withdraw');
+  });
   check('withdraw matches a DOI URL that has a trailing slash', () => {
     const d = join(work, 'doislash'); mkdirSync(d);
     writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (https://doi.org/10.1000/xyz182/). Impl.\n');
@@ -681,6 +690,9 @@ try {
     const r = run(['requalify', '--check', c]);
     eq(r.code, 1, 'exit');
     if (!/self-integrity/.test(r.stderr)) throw new Error('did not catch the sidecar tamper');
+    const again = run(['withdraw', FIND_ID, '--reason', 'retracted', '--from', c]);
+    eq(again.code, 1, 'withdraw over a tampered sidecar');
+    if (!/self-integrity/.test(again.stderr)) throw new Error(again.stderr);
   });
   check('withdraw is line-ending invariant (CRLF dispatch -> same receipt_sha256 as LF)', () => {
     const body = '# a\n\n' + GROUND(FIND_ID);
