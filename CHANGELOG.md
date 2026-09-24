@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format is based on 
 - The lock example's shape sample shows schema v2. The sample CI workflow pins `@dogfood-lab/study-swarm@2.0.0` instead of `@latest`. The release workflow installs `npm@11.5.1` exactly.
 - SECURITY.md reports issues on GitHub and lists the lock, tombstone, and receipt writes. The handbook halt table and three broken handbook links match the protocol. SHIP_GATE's exit code 1 includes lock drift and `requalify --check`.
 - The landing page, the handbook, and the README CI recipe use the same prompt-hash wording and the same `@2.0.0` pin as the shipped sample. Translated security sections name the lock, tombstone, and receipt writes. SECURITY.md lists 2.x as the supported line.
+- A markdown-wrapped DOI or URL is the same identifier as the bare form, so `withdraw` and `requalify --resolve --mode removed` still see it. A function-word year is rejected in any case, and a real author later in the same finding still counts. An unclosed fence fails those compensator commands instead of looking like the citation is gone. A non-string `output_sha256` is rejected.
 
 ## [2.0.0] — 2026-07-05
 

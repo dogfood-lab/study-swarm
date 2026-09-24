@@ -139,6 +139,24 @@ try {
     eq(r.code, 1, 'exit');
     if (!JSON.parse(r.stdout).problems.some((x) => x.rule === 'missing-author')) throw new Error('expected missing-author');
   });
+  check('lint rejects a function-word year in any case, and still accepts a later real author', () => {
+    const bad = lintFile('thecaps.dispatch.md', '# d\n\n## Research grounding\n1. **F.** THE 2024 (arXiv:2310.01798). Impl.\n');
+    eq(run(['lint', bad]).code, 1, 'THE');
+    const ok = lintFile('titleyear.dispatch.md', '# d\n\n## Research grounding\n1. **The 2024 benchmark.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n');
+    eq(run(['lint', ok]).code, 0, 'later author');
+  });
+  check('withdraw sees a markdown-wrapped DOI (exit 0)', () => {
+    const d = join(work, 'wrapdoi'); mkdirSync(d);
+    writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (<https://doi.org/10.1000/xyz182>). Impl.\n');
+    eq(run(['withdraw', '10.1000/xyz182', '--reason', 'retracted', '--from', d]).code, 0, 'withdraw');
+  });
+  check('withdraw refuses an unclosed fence instead of reporting the citation absent (exit 1)', () => {
+    const d = join(work, 'fencewd'); mkdirSync(d);
+    writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n```\nalso arXiv:2402.15089\n');
+    const r = run(['withdraw', 'arXiv:2402.15089', '--reason', 'retracted', '--from', d]);
+    eq(r.code, 1, 'exit');
+    if (!/unclosed code fence/.test(r.stderr)) throw new Error(r.stderr);
+  });
   check('lint accepts a comma between the author and the year (exit 0)', () => {
     const p = lintFile('comma.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Smith, 2024 (arXiv:2310.01798). Impl.\n2. **G.** Huang et al., 2023 (arXiv:2402.01817). Impl.\n');
     eq(run(['lint', p]).code, 0, 'exit');
@@ -395,6 +413,15 @@ try {
     const r = run(['lock', dp, '--from', op]);
     eq(r.code, 2, 'exit');
     if (!/does not match/.test(r.stderr)) throw new Error(r.stderr);
+  });
+  check('lock rejects a non-string output_sha256 (exit 2)', () => {
+    const d = join(work, 'objhash'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: 'm', prompt: 'P', tool_schema: { type: 'object' }, output_sha256: { sha: 'nope' } }] }));
+    const r = run(['lock', dp, '--from', op]);
+    eq(r.code, 2, 'exit');
+    if (!/output_sha256 must be a string/.test(r.stderr)) throw new Error(r.stderr);
   });
   check('lock rejects a non-string resolved_model (exit 2)', () => {
     const d = join(work, 'objmodel'); mkdirSync(d, { recursive: true });
