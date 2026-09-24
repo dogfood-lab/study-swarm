@@ -24,7 +24,7 @@ It applies its own medicine. The protocol prescribes verifier-protected envelope
 1. **Identify** 3–5 load-bearing design questions where empirical evidence would change the answer.
 2. **Dispatch** one research agent per question, in parallel. Each must return paper titles + authors + years + URLs + a one-sentence finding — specificity over breadth ("6–8 well-sourced findings beat 20 vague gestures").
 3. **Synthesize** the findings into a *Research grounding* section: `N. **<finding>.** <Authors> <year> (<arXiv/DOI>). <design implication>.`
-4. **Verify externally** — a *different model family*, reasoning-stripped, checks every citation in two stages: a **retrieval oracle** confirms the paper exists (never the model's memory), then a **groundedness** lens confirms the finding matches the source. **Halt** on fabricated/misattributed; **halt-and-escalate** if the verifier or retrieval oracle is unavailable (never read absence as "citations fine").
+4. **Verify externally** — a *different model family*, reasoning-stripped, checks every citation in two stages: a **retrieval oracle** confirms the paper exists (never the model's memory), then a **groundedness** lens confirms the finding matches the source. **Drop** a fabricated finding; **correct a misattribution once** and re-verify (a second non-clean verdict drops it). **Halt-and-escalate** only when the verifier or the retrieval oracle is unavailable (never read absence as "citations fine").
 5. **Connect** each architectural choice back to a finding by number. Citations without a design implication are noise.
 
 The full executable detail — the halt table, the sourcing standard, the ensemble rule — is in **[PROTOCOL.md](PROTOCOL.md)**.
