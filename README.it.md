@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### Blocca un sistema per la riproduzione (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Sicurezza
 
-`study-swarm` include una **CLI leggera, senza dipendenze** (`study-swarm`) insieme alla metodologia. Non effettua **nessuna chiamata di rete o al modello** e non raccoglie **dati di telemetria**; non ci sono segreti o credenziali nel codice sorgente. In fase di esecuzione legge solo il file che si passa a `lint` e scrive un singolo file `<slug>.dispatch.md` nella directory corrente per `new` (rifiutando di sovrascriverlo e operando sempre all'interno della directory di lavoro). La verifica basata sul modello descritta dalla metodologia (Passaggio 4) viene eseguita dagli strumenti correlati, non da questo pacchetto. Vedere [SECURITY.md](SECURITY.md).
+`study-swarm` include una **CLI leggera, senza dipendenze** (`study-swarm`) insieme alla metodologia. Non effettua **nessuna chiamata di rete o al modello** e non raccoglie **dati di telemetria**; non ci sono segreti o credenziali nel codice sorgente. In fase di esecuzione legge i file che nomini. `new` scrive un solo `<slug>.dispatch.md` nella directory di lavoro (senza sovrascrivere e senza uscirne). `lock`, `withdraw` e `requalify` scrivono anche un lock, un sidecar tombstone e, con `--receipt`, una ricevuta nel percorso indicato. La verifica basata sul modello descritta dalla metodologia (Passaggio 4) viene eseguita dagli strumenti correlati, non da questo pacchetto. Vedere [SECURITY.md](SECURITY.md).
 
 ## Stato
 

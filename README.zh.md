@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### 将一个调度固定下来以便重放 (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## 安全性
 
-`study-swarm`提供了一个**轻量级、零依赖的CLI**（`study-swarm`），以及该方法论。它**不进行任何网络或模型调用，也不收集任何遥测数据**；源代码中没有秘密或凭据。在运行时，它只会读取您传递给`lint`的文件，并在当前目录中写入一个`<slug>.dispatch.md`文件（拒绝覆盖，并且绝不会超出工作目录）。该方法论描述的基于模型的验证（第4步）由辅助工具执行，而不是由此软件包执行。请参阅[SECURITY.md](SECURITY.md)。
+`study-swarm`提供了一个**轻量级、零依赖的CLI**（`study-swarm`），以及该方法论。它**不进行任何网络或模型调用，也不收集任何遥测数据**；源代码中没有秘密或凭据。在运行时，它读取你指定的文件。`new` 在工作目录中写入一个 `<slug>.dispatch.md`（不覆盖，也不写到目录外）。`lock`、`withdraw` 和 `requalify` 还会写入 lock 文件、墓碑 sidecar，以及在传入 `--receipt` 时按你给出的路径写入回执。该方法论描述的基于模型的验证（第4步）由辅助工具执行，而不是由此软件包执行。请参阅[SECURITY.md](SECURITY.md)。
 
 ## 状态
 

@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### Fixe um envio para reprodução (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Segurança
 
-`study-swarm` fornece uma **CLI fina e sem dependências de runtime** (`study-swarm`) junto com a metodologia. Ele não faz **chamadas de rede ou modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele lê apenas o arquivo que você passa para `lint` e grava um único arquivo `<slug>.dispatch.md` no diretório atual para `new` (recusando-se a sobrescrever e nunca fora do diretório de trabalho). A verificação baseada em modelo descrita na metodologia (Etapa 4) é executada pelas ferramentas complementares, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
+`study-swarm` fornece uma **CLI fina e sem dependências de runtime** (`study-swarm`) junto com a metodologia. Ele não faz **chamadas de rede ou modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele lê os arquivos que você nomeia. `new` grava um único `<slug>.dispatch.md` no diretório de trabalho (sem sobrescrever e sem sair dele). `lock`, `withdraw` e `requalify` também gravam um lock, um sidecar de lápide e, com `--receipt`, um recibo no caminho indicado. A verificação baseada em modelo descrita na metodologia (Etapa 4) é executada pelas ferramentas complementares, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
 
 ## Status
 

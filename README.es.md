@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### Fija un envío para su reproducción (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Seguridad
 
-`study-swarm` incluye una **CLI delgada, con cero dependencias** (`study-swarm`) junto con la metodología. No realiza **ninguna llamada a la red ni al modelo** y no recopila **ningún dato de telemetría**; no hay secretos ni credenciales en el código fuente. En tiempo de ejecución, solo lee el archivo que se le pasa a `lint` y escribe un único archivo `<slug>.dispatch.md` en el directorio actual para la opción `new` (rechazando sobrescribir y nunca saliendo del directorio de trabajo). La verificación basada en modelos que describe la metodología (paso 4) la realizan las herramientas complementarias, no este paquete. Consulte [SECURITY.md](SECURITY.md).
+`study-swarm` incluye una **CLI delgada, con cero dependencias** (`study-swarm`) junto con la metodología. No realiza **ninguna llamada a la red ni al modelo** y no recopila **ningún dato de telemetría**; no hay secretos ni credenciales en el código fuente. En tiempo de ejecución lee los archivos que nombras. `new` escribe un único `<slug>.dispatch.md` en el directorio de trabajo (sin sobrescribir y sin salir de él). `lock`, `withdraw` y `requalify` también escriben un lock, un sidecar de lápida y, si pasas `--receipt`, un recibo en la ruta que indicas. La verificación basada en modelos que describe la metodología (paso 4) la realizan las herramientas complementarias, no este paquete. Consulte [SECURITY.md](SECURITY.md).
 
 ## Estado
 

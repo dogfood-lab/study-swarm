@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### ディスパッチをリプレイ用に固定する（`dispatch.lock.json`）
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## セキュリティ
 
-`study-swarm` は、この手法とともに、**軽量で依存関係のないCLI（コマンドラインインターフェース）** (`study-swarm`) を提供します。**ネットワーク接続やモデルへのアクセスは行わず、テレメトリデータも収集しません。** ソースコードには、秘密情報や認証情報は含まれていません。実行時には、`lint` に渡されたファイルのみを読み取り、現在のディレクトリに `<slug>.dispatch.md` という名前のファイルを1つだけ書き込みます（上書きは行わず、作業ディレクトリ外への書き込みも行いません）。この手法で説明されているモデルベースの検証（ステップ4）は、このパッケージではなく、関連するツールによって実行されます。詳細は [SECURITY.md](SECURITY.md) を参照してください。
+`study-swarm` は、この手法とともに、**軽量で依存関係のないCLI（コマンドラインインターフェース）** (`study-swarm`) を提供します。**ネットワーク接続やモデルへのアクセスは行わず、テレメトリデータも収集しません。** ソースコードには、秘密情報や認証情報は含まれていません。実行時には、指定したファイルを読み取ります。`new` は作業ディレクトリに `<slug>.dispatch.md` を1つだけ書き込みます（上書きせず、ディレクトリの外にも書きません）。`lock`、`withdraw`、`requalify` は lock ファイルと墓標 sidecar も書き、`--receipt` を渡すとそのパスにレシートを書きます。この手法で説明されているモデルベースの検証（ステップ4）は、このパッケージではなく、関連するツールによって実行されます。詳細は [SECURITY.md](SECURITY.md) を参照してください。
 
 ## ステータス
 
