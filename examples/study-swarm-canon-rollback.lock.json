@@ -1,6 +1,6 @@
 {
   "schema": "dispatch.lock/v2",
-  "study_swarm_version": "2.0.0",
+  "study_swarm_version": "2.1.0",
   "protocol_sha256": "sha256-p9LMoGfOGIASHIfFo6RkgpiCtnHlTtxcuPsTzQ+fuYY=",
   "dispatch_sha256": "sha256-ijvMoQs5/bOj7qpVJCd+LTfkyqkmd0nSMAEA936cvBs=",
   "steps": [
@@ -74,5 +74,5 @@
     "citations_sha256": "70a0d84650477090be49925bf4b53ab52b8fdb88ebf5d2487f3000ea96fc810a",
     "receipt_chain_sha256": "dcd57fc2ec8d66992e9762e1e551aee75829dda2bf9cc0837bc3106f48cece94"
   },
-  "lock_sha256": "sha256-MGgvDyDs7CQocxhfurcGVrm82Xk9hyhqQ4hexjCnltc="
+  "lock_sha256": "sha256-mWahjOhCcfrb4j6SOluUivQyAW5XlK8eKZDBmAiyMPo="
 }

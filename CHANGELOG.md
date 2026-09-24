@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Fixed
 
+- The two shipped example locks were regenerated so `lock --verify` passes on this version. The lock hash includes the CLI version.
 - `lint` keeps every identifier on a finding. A URL earlier in the sentence no longer hides a later arXiv, DOI, or RFC from `withdraw` and from `requalify --resolve --mode removed`.
 - An unclosed code fence in Research grounding fails the lint. The lines after it are not treated as clean.
 - Finding numbers are the integers written on the markdown items, not the position in the list.
