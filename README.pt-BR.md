@@ -82,7 +82,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **Mecanismo de compensação para reversão do canon.** Marcar cada registro no corpus cujo *fundamento da pesquisa* cite `<id>` como `evidência-retirada` (um arquivo auxiliar `<slug>.withdrawn.json` — marcar, nunca excluir) e emitir um comprovante de retirada com base no conteúdo. `--reason` ∈ `fabricado · atribuído incorretamente · revogado · verificador alterado · outro`. |
 | `study-swarm requalify --check <corpus-dir>` | Falhar em modo fechado (sair com código `1`) para qualquer registro que contenha uma marcação `evidência-retirada` não resolvida — o sinalizador que **interrompe** os elementos dependentes de um resultado retirado até que seja removido ou reavaliado. Gates CI. |
 | `study-swarm requalify --status <corpus-dir> [--json]` | Visualização somente leitura do estado de validade das evidências de um corpus – contagem de conclusões retiradas versus resolvidas, uma divisão por motivo e modo de resolução, linhas por relatório. Informativo (retorna `0`), diferente da verificação `--check`. |
-| `study-swarm requalify --resolve <registro> <id> --mode removed\ | regrounded [--note …]` | Remover uma marcação assim que o resultado for removido (a citação desaparecer) ou reavaliado (reverificado e validado pelo executor irmão; `--note` registra a confirmação). Idempotente; adiciona ao histórico de auditoria do arquivo auxiliar. |
+| `study-swarm requalify --resolve <registro> <id> --mode removed\|regrounded [--note …]` | Remover uma marcação assim que o resultado for removido (a citação desaparecer) ou reavaliado (reverificado e validado pelo executor irmão; `--note` registra a confirmação). Idempotente; adiciona ao histórico de auditoria do arquivo auxiliar. |
 
 `lint` é determinístico – sem chamadas de modelo – portanto, é seguro no CI. Ele aplica o **padrão de referência da Etapa 3** localmente; a verificação baseada em modelo da **Etapa 4** ainda depende de [`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prism.
 
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Segurança
 
-`study-swarm` fornece uma **CLI fina e com poucas dependências** (`study-swarm`) junto com a metodologia. Ele não faz **chamadas de rede ou modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele lê apenas o arquivo que você passa para `lint` e grava um único arquivo `<slug>.dispatch.md` no diretório atual para `new` (recusando-se a sobrescrever e nunca fora do diretório de trabalho). A verificação baseada em modelo descrita na metodologia (Etapa 4) é executada pelas ferramentas complementares, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
+`study-swarm` fornece uma **CLI fina e sem dependências de runtime** (`study-swarm`) junto com a metodologia. Ele não faz **chamadas de rede ou modelo** e não coleta **telemetria**; não há segredos ou credenciais no código-fonte. Em tempo de execução, ele lê apenas o arquivo que você passa para `lint` e grava um único arquivo `<slug>.dispatch.md` no diretório atual para `new` (recusando-se a sobrescrever e nunca fora do diretório de trabalho). A verificação baseada em modelo descrita na metodologia (Etapa 4) é executada pelas ferramentas complementares, não por este pacote. Consulte [SECURITY.md](SECURITY.md).
 
 ## Status
 

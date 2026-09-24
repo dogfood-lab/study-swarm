@@ -93,10 +93,10 @@ Each choice traces to findings by number. The shape:
 
 ```json
 {
-  "schema": "dispatch.lock/v1",
-  "study_swarm_version": "1.2.0",
-  "protocol_sha256": "<full sha256 of the vendored PROTOCOL.md>",
-  "dispatch_sha256": "<sha256 of the dispatch .md bytes>",
+  "schema": "dispatch.lock/v2",
+  "study_swarm_version": "2.0.0",
+  "protocol_sha256": "sha256-<base64 of the text-normalized PROTOCOL.md>",
+  "dispatch_sha256": "sha256-<base64 of the text-normalized dispatch>",
   "steps": [
     {
       "question_id": "Q1-replay-manifest",
@@ -114,7 +114,7 @@ Each choice traces to findings by number. The shape:
     "verifier_model": "mistral-small:24b",
     "verifier_family": "local",
     "receipt_id": "prism-...",
-    "receipt_chain_sha256": "sha256-<base64>"
+    "receipt_chain_sha256": "<bare hex of the verifier receipt chain>"
   },
   "lock_sha256": "sha256-<base64>"
 }

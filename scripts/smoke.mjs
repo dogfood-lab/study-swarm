@@ -3,7 +3,8 @@
 // Temp files are created under a throwaway os.tmpdir() directory and removed in `finally`,
 // so a failed/interrupted run never leaks scratch files into the working tree.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,6 +127,45 @@ try {
     const p = lintFile('fence.dispatch.md', '# d\n\n## Research grounding\n1. **A real finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n\n```\n1. example output\n2. more output\n```\n');
     eq(run(['lint', p]).code, 0, 'exit');
   });
+  check('lint fails an unclosed fence instead of ignoring the tail (exit 1)', () => {
+    const p = lintFile('openfence.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n```\nstudies show this with no author\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    if (!JSON.parse(r.stdout).problems.some((x) => x.rule === 'unclosed-fence')) throw new Error('expected unclosed-fence');
+  });
+  check('lint rejects a bare function word as an author (missing-author, exit 1)', () => {
+    const p = lintFile('the2024.dispatch.md', '# d\n\n## Research grounding\n1. **F.** The 2024 (arXiv:2310.01798). Impl.\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    if (!JSON.parse(r.stdout).problems.some((x) => x.rule === 'missing-author')) throw new Error('expected missing-author');
+  });
+  check('lint accepts a comma between the author and the year (exit 0)', () => {
+    const p = lintFile('comma.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Smith, 2024 (arXiv:2310.01798). Impl.\n2. **G.** Huang et al., 2023 (arXiv:2402.01817). Impl.\n');
+    eq(run(['lint', p]).code, 0, 'exit');
+  });
+  check('lint uses the markdown finding number, not the list index', () => {
+    const body = '# d\n\n## Research grounding\n2. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n4. **B.** Kim 2025 (arXiv:2506.07962). Impl.\n\n## Step 5 — Architecture\n- **C1.** (findings 2, 4)\n';
+    const r = run(['lint', '--json', '--strict', lintFile('nums.dispatch.md', body)]);
+    eq(r.code, 0, 'exit');
+    const nums = JSON.parse(r.stdout).findings.map((f) => f.finding).join(',');
+    if (nums !== '2,4') throw new Error(`numbers: ${nums}`);
+  });
+  check('withdraw matches an identifier that is not the first one on the finding', () => {
+    const d = join(work, 'twoid'); mkdirSync(d);
+    writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (https://example.com/paper) also arXiv:2402.15089. Impl.\n');
+    eq(run(['withdraw', 'arXiv:2402.15089', '--reason', 'retracted', '--from', d]).code, 0, 'withdraw');
+  });
+  check('lint of a directory does not report clean when a dispatch is only a symlink (exit 1)', () => {
+    const d = join(work, 'links'); mkdirSync(d);
+    const sub = join(d, 'sub'); mkdirSync(sub);
+    const real = join(d, 'real.dispatch.md');
+    writeFileSync(real, '# d\n\n## Research grounding\n1. **F.** 2024 (arXiv:2310.01798).\n');
+    try { symlinkSync(real, join(sub, 'via.dispatch.md')); }
+    catch (e) { if (e && (e.code === 'EPERM' || e.code === 'ENOTSUP')) return; throw e; }
+    const r = run(['lint', sub]);
+    eq(r.code, 1, 'exit');
+    if (!/refusing a clean result/.test(r.stderr)) throw new Error(r.stderr);
+  });
   // --- new lint capabilities: --json, directories, stdin, the shipped example ---
   check('lint --json on a clean file exits 0 and parses to ok:true', () => {
     const p = lintFile('jsonok.dispatch.md', '# d\n\n## Research grounding\n1. **A finding.** Huang et al. 2023 (arXiv:2310.01798). Implication.\n');
@@ -173,6 +213,9 @@ try {
     eq(r.code, 0, 'exit');
     const body = readFileSync(join(work, 'prov.dispatch.md'), 'utf8');
     if (!/study-swarm v\d+\.\d+\.\d+ · protocol-sha256:[0-9a-f]{16}/.test(body)) throw new Error('no provenance stamp');
+    const proto = readFileSync(resolve(__dirname, '../PROTOCOL.md'), 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').normalize('NFC');
+    const prefix = createHash('sha256').update(proto).digest('hex').slice(0, 16);
+    if (!body.includes(`protocol-sha256:${prefix}`)) throw new Error(`stamp is not the PROTOCOL.md prefix ${prefix}`);
   });
   check('the shipped worked example lints clean (exit 0)', () => {
     const ex = resolve(__dirname, '../examples/study-swarm-self.dispatch.md');
@@ -342,6 +385,25 @@ try {
     const r = run(['lock', dp, '--from', op]);
     eq(r.code, 2, 'exit');
     if (!/output_sha256/.test(r.stderr)) throw new Error('expected output_sha256 rejection');
+  });
+  check('lock rejects an output_sha256 that does not match the output bytes (exit 2)', () => {
+    const d = join(work, 'bothhash'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    const fake = 'sha256-' + Buffer.from('x'.repeat(32)).toString('base64');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: 'm', prompt: 'P', tool_schema: { type: 'object' }, output: 'hello', output_sha256: fake }] }));
+    const r = run(['lock', dp, '--from', op]);
+    eq(r.code, 2, 'exit');
+    if (!/does not match/.test(r.stderr)) throw new Error(r.stderr);
+  });
+  check('lock rejects a non-string resolved_model (exit 2)', () => {
+    const d = join(work, 'objmodel'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: { id: 'm' }, prompt: 'P', tool_schema: { type: 'object' } }] }));
+    const r = run(['lock', dp, '--from', op]);
+    eq(r.code, 2, 'exit');
+    if (!/resolved_model/.test(r.stderr)) throw new Error(r.stderr);
   });
   // FG-06: a prompt whose text equals a schema's canonical JSON must NOT collide (domain separation).
   check('domain separation: a prompt equal to a schema JCS does not collide, and the lock is v2 (FG-06)', () => {

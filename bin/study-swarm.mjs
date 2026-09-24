@@ -30,7 +30,7 @@ COMMANDS
                            harness record to feed to "lock <dispatch> --from".
   lock <dispatch> --from <orchestration.json>
                            Emit <dispatch>.lock.json — pin (per Step-2 agent) the resolved
-                           model + SHA-256 of the byte-exact prompt + SHA-256 of the tool
+                           model + SHA-256 of the text-normalized prompt + SHA-256 of the tool
                            schema, plus the verifier receipt, rolled into one lock_sha256.
   lock --verify <dispatch> [--from <orchestration.json>]
                            Re-derive the deterministic hashes and assert they match the lock;
@@ -161,7 +161,19 @@ const BANNED = /\b(studies show|research suggests|it'?s well[- ]established|well
 // empty-matchable `\s*,?\s*`) and is bounded ({0,24}), so it is linear-time — the previous
 // form had catastrophic backtracking (ReDoS) on a long capitalized/`and`-joined run with no
 // trailing year, hanging the CI-gating `lint` command.
-const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:,?\s+(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+)){0,24}\s+\(?(?:19|20)\d{2}/u;
+const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:,?\s+(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-]+)){0,24}(?:,\s*|\s+)\(?(?:19|20)\d{2}/u;
+// A single function word before a year is not an author ("The 2024"). A name, "et al.", or a
+// multi-word organization still is. Checked after the regex so the stop-list cannot reintroduce
+// the empty-match backtracking the quantified group above was rewritten to avoid.
+const AUTHOR_STOP = new Set('The A An This That These Those It Its In On For With From And But Or Of To As At By We Our'.split(' '));
+function authorOk(text) {
+  const m = AUTHOR.exec(text);
+  if (!m) return false;
+  const phrase = m[0].replace(/(?:,\s*|\s+)\(?((?:19|20)\d{2})\s*$/, '').trim();
+  const words = phrase.split(/\s+/).map((w) => w.replace(/[.,]$/, ''));
+  if (words.length === 1 && AUTHOR_STOP.has(words[0])) return false;
+  return true;
+}
 
 // --- strict mode: Step-5 connection / orphan-citation check (opt-in --strict) --------------
 // Step 5 requires each finding to inform a design choice — "citations without a connection are
@@ -236,12 +248,19 @@ function lintText(label, raw, strict) {
     else if (cur && l.trim()) cur.text += ' ' + l.trim();
   });
   if (cur) findings.push(cur);
+  if (inFence) add('unclosed-fence', 'Research grounding has an unclosed code fence, so the lines after it were not checked.', start + 1 + section.length);
 
   if (findings.length === 0) add('no-findings', 'Research grounding has no numbered findings.');
 
   const parsed = [];
+  const seenNumbers = new Set();
   findings.forEach((f, i) => {
-    const n = i + 1;
+    // The citation number is the integer the author wrote, not this array's index.
+    // "2." then "4." are findings 2 and 4. Step 5 and requalify both use that number.
+    const declared = /^(\d+)\.\s/.exec(f.text.trim());
+    const n = declared ? Number(declared[1]) : i + 1;
+    if (seenNumbers.has(n)) add('duplicate-finding-number', `finding number ${n} is used more than once.`, f.line, n);
+    seenNumbers.add(n);
     if (PLACEHOLDER.test(f.text)) add('placeholder', `finding ${n}: still has template placeholders — fill it in.`, f.line, n);
     // Strip identifiers before the year check so digits inside a citation can't masquerade
     // as a publication year: an arXiv id's YYMM prefix (e.g. 2402 in arXiv:2402.01817), a DOI,
@@ -249,12 +268,16 @@ function lintText(label, raw, strict) {
     // stripped first so a DOI-bearing URL is removed whole.
     const fNoIds = f.text.replace(/https?:\/\/\S+/gi, '').replace(/arxiv:\s*\d{4}\.\d{4,5}/gi, '').replace(/10\.\d{4,9}\/\S+/g, '');
     if (!YEAR.test(fNoIds)) add('missing-year', `finding ${n}: missing a year (spell it out, e.g. "2024" — an arXiv id alone is not a year).`, f.line, n);
-    if (!AUTHOR.test(f.text)) add('missing-author', `finding ${n}: missing an author before the year (e.g. "Huang et al. 2023").`, f.line, n);
-    const idm = f.text.match(ID);
-    if (!idm) add('missing-id', `finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, URL, or RFC number).`, f.line, n);
+    if (!authorOk(f.text)) add('missing-author', `finding ${n}: missing an author before the year (e.g. "Huang et al. 2023").`, f.line, n);
+    // Every identifier, not the first. A URL earlier in the sentence must not hide a later arXiv
+    // or DOI from withdraw / requalify --resolve --mode removed.
+    const identifiers = [];
+    for (const m of f.text.matchAll(new RegExp(ID.source, 'gi'))) {
+      identifiers.push(m[0].replace(/\s+/g, '').replace(/[).,;]+$/, ''));
+    }
+    if (identifiers.length === 0) add('missing-id', `finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, URL, or RFC number).`, f.line, n);
     const ym = fNoIds.match(YEAR);
-    const ident = idm ? idm[0].replace(/\s+/g, '').replace(/[).,;]+$/, '') : null;
-    parsed.push({ finding: n, year: ym ? ym[0] : null, identifier: ident });
+    parsed.push({ finding: n, year: ym ? ym[0] : null, identifier: identifiers[0] || null, identifiers });
   });
 
   // Banned gesture anywhere in the section (outside fences): a finding STATES its result,
@@ -275,7 +298,7 @@ function lintText(label, raw, strict) {
     } else {
       const refs = referencedNumbers(body);
       findings.forEach((f, i) => {
-        const n = i + 1;
+        const n = parsed[i].finding;
         const tok = authorTokenOf(f.text);
         // Match the author token OR (for a hyphenated surname like "Garcia-Molina") its first
         // component, so a Step-5 reference to just "Garcia" still connects — the liberal direction.
@@ -292,31 +315,59 @@ function lintText(label, raw, strict) {
 }
 
 // Recursively collect files whose name matches `re` under `dir`, sorted for determinism.
-// Resilient by design:
-//  - an unreadable directory (EACCES/EPERM/ENOTDIR) is SKIPPED with a stderr note, never fatal, so a
-//    single bad node does not abort a whole-corpus lint / withdraw / requalify (PH-02);
-//  - symlinked entries are not followed, and a realpath `seen` set breaks directory-junction cycles
-//    (common on Windows) that would otherwise recurse until stack / path-length exhaustion (PH-03).
-// Skips node_modules/.git.
-function walkFiles(dir, re, seen) {
+// A gate that could not read part of the tree must not report the rest as clean:
+//  - an unreadable directory is recorded on `report.unreadable` (the caller fails the gate);
+//  - a symlink or junction whose name matches `re`, or that points at a directory, is not followed
+//    and is recorded on `report.skippedLinks`. A link to an ordinary non-matching file is ignored.
+// A realpath `seen` set still breaks a cycle if a real directory is reached twice (PH-03).
+// Skips node_modules/.git by name, before the link check.
+function newWalkReport() {
+  return { unreadable: [], skippedLinks: [] };
+}
+function walkFiles(dir, re, seen, report) {
   seen = seen || new Set();
+  report = report || newWalkReport();
   let real; try { real = realpathSync(dir); } catch { real = dir; }
-  if (seen.has(real)) return []; // already visited via another path — junction/symlink cycle guard
+  if (seen.has(real)) return [];
   seen.add(real);
   let entries;
   try { entries = readdirSync(dir, { withFileTypes: true }); }
-  catch (err) { process.stderr.write(`study-swarm: skipping ${dir}: ${err && err.code ? err.code : err.message}\n`); return []; }
+  catch (err) {
+    const code = err && err.code ? err.code : String(err && err.message || err);
+    report.unreadable.push({ dir, code });
+    process.stderr.write(`study-swarm: cannot list ${dir}: ${code}\n`);
+    return [];
+  }
   const out = [];
   for (const entry of entries) {
     if (entry.name === 'node_modules' || entry.name === '.git') continue;
-    if (entry.isSymbolicLink()) continue; // don't follow symlinks (cycle + directory-escape safety)
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkFiles(full, re, seen));
+    if (entry.isSymbolicLink()) {
+      let followed = null;
+      try { followed = statSync(full); } catch { followed = null; }
+      if (re.test(entry.name) || !followed || followed.isDirectory()) {
+        report.skippedLinks.push(full);
+        process.stderr.write(`study-swarm: not following ${full}\n`);
+      }
+      continue;
+    }
+    if (entry.isDirectory()) out.push(...walkFiles(full, re, seen, report));
     else if (re.test(entry.name)) out.push(full);
   }
   return out.sort();
 }
-function walkDispatches(dir) { return walkFiles(dir, /\.dispatch\.md$/i); }
+function walkBlockedMessage(report) {
+  if (!report) return null;
+  const parts = [];
+  if (report.unreadable.length) {
+    parts.push(`${report.unreadable.length} unlistable director${report.unreadable.length === 1 ? 'y' : 'ies'} (${report.unreadable.map((u) => u.dir).join(', ')})`);
+  }
+  if (report.skippedLinks.length) {
+    parts.push(`${report.skippedLinks.length} skipped symlink(s) (${report.skippedLinks.join(', ')})`);
+  }
+  return parts.length ? `refusing a clean result — the walk could not read everything under the path you passed: ${parts.join('; ')}` : null;
+}
+function walkDispatches(dir, report) { return walkFiles(dir, /\.dispatch\.md$/i, undefined, report); }
 
 function readTarget(p) {
   try { return { label: p, raw: readFileSync(p, 'utf8') }; }
@@ -342,7 +393,10 @@ function cmdLint(args) {
     }
     if (!existsSync(p)) fail(2, `path not found: ${p}`);
     if (statSync(p).isDirectory()) {
-      const files = walkDispatches(p);
+      const report = newWalkReport();
+      const files = walkDispatches(p, report);
+      const blocked = walkBlockedMessage(report);
+      if (blocked) fail(1, blocked);
       if (files.length === 0) fail(2, `no .dispatch.md files found under ${p}`);
       for (const f of files) targets.push(readTarget(f));
     } else {
@@ -385,7 +439,7 @@ function cmdLint(args) {
 // --- lock core (dispatch.lock.json — the PIN_PER_STEP feature) ------------------
 // Design + research grounding: examples/study-swarm-lock.dispatch.md (choices L1-L11).
 // The CLI is a PURE FUNCTION of provided bytes: the orchestration harness emits the record
-// (resolved models + byte-exact prompts + tool schemas + verifier receipt); the CLI only
+// (resolved models + text-normalized prompts + tool schemas + verifier receipt); the CLI only
 // canonicalizes + hashes + validates it. No network, no model calls (L2).
 
 const LOCK_SCHEMA = 'dispatch.lock/v2';
@@ -393,6 +447,11 @@ const LOCK_SCHEMA = 'dispatch.lock/v2';
 // Self-describing digest "sha256-<base64>" — the W3C Subresource Integrity form: algorithm-
 // prefixed (so it's algorithm-agile) and used fail-closed on mismatch (L9; lock dispatch finding 38).
 function sriBytes(buf) { return 'sha256-' + createHash('sha256').update(buf).digest('base64'); }
+function sha256DigestOk(value) {
+  const m = /^sha256-([A-Za-z0-9+/]+)=*$/.exec(value);
+  if (!m) return false;
+  return Buffer.from(m[1], 'base64').length === 32;
+}
 // Domain-separation tags (v2): a TEXT preimage and a structured-JSON (JCS) preimage are hashed in
 // DISJOINT spaces, so a prompt whose literal text happens to equal some tool schema's canonical JSON
 // can never produce the same digest as that schema (the tagged-hash / DSSE "hash known bytes with a
@@ -454,10 +513,14 @@ function buildLockObject(dispatchPath, orchestration) {
       if (s == null || s[k] === undefined || s[k] === null) fail(2, `orchestration step ${i + 1} is missing "${k}"`);
       return s[k];
     };
+    const model = need('resolved_model');
+    const prompt = need('prompt');
+    if (typeof model !== 'string' || !model.trim()) fail(2, `orchestration step ${i + 1} resolved_model must be a non-empty string`);
+    if (typeof prompt !== 'string') fail(2, `orchestration step ${i + 1} prompt must be a string`);
     const rec = {
       question_id: String(need('question_id')),
-      resolved_model: String(need('resolved_model')),       // L6 — the resolved id, never an alias
-      prompt_sha256: sriText(String(need('prompt'))),       // L3 — text-normalized (LF/NFC/BOM), not JCS-restructured
+      resolved_model: model,                                 // L6 — the resolved id, never an alias
+      prompt_sha256: sriText(prompt),                       // L3 — text-normalized (LF/NFC/BOM), not JCS-restructured
       tool_schema_sha256: jcsDigest(need('tool_schema')),   // L5 — canonicalized tool surface
     };
     if (s.schema_dialect) rec.schema_dialect = String(s.schema_dialect); // L5 — dialect is contract
@@ -466,12 +529,16 @@ function buildLockObject(dispatchPath, orchestration) {
     // output (the CLI hashes it) OR a pre-computed output_sha256 (large outputs needn't be shipped).
     // A caller-supplied digest is validated to the SRI sha256- shape here, so a malformed hash is
     // rejected where it enters rather than mis-surfacing as "drift" on a later verify (PH-05).
+    const hashed = s.output !== undefined ? (typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output)) : null;
     if (typeof s.output_sha256 === 'string') {
-      if (!/^sha256-[A-Za-z0-9+/]+=*$/.test(s.output_sha256)) {
-        fail(2, `orchestration step ${i + 1} output_sha256 is not an "sha256-<base64>" digest: "${s.output_sha256}"`);
+      if (!sha256DigestOk(s.output_sha256)) {
+        fail(2, `orchestration step ${i + 1} output_sha256 is not a sha256 digest of 32 bytes: "${s.output_sha256}"`);
+      }
+      if (hashed !== null && hashed !== s.output_sha256) {
+        fail(2, `orchestration step ${i + 1} output_sha256 does not match the output bytes`);
       }
       rec.output_sha256 = s.output_sha256;
-    } else if (s.output !== undefined) rec.output_sha256 = typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output);
+    } else if (hashed !== null) rec.output_sha256 = hashed;
     return rec;
   });
   const lock = {
@@ -552,7 +619,7 @@ const orchTemplate = () => JSON.stringify({
     {
       question_id: '<Q1-short-slug>',
       resolved_model: '<resolved model id, e.g. claude-opus-4-8 — never a floating alias>',
-      prompt: '<the byte-exact prompt string this research agent was given>',
+      prompt: '<the prompt string this research agent was given; the lock hashes it text-normalized: BOM stripped, CR/CRLF folded to LF, NFC>',
       tool_schema: { type: 'object', properties: {} },
       schema_dialect: 'https://json-schema.org/draft/2020-12/schema',
     },
@@ -618,7 +685,7 @@ function cmdLock(args) {
   }
 
   if (!orchestration) {
-    fail(2, 'study-swarm lock <dispatch> requires --from <orchestration.json> — the harness-emitted record of resolved models + byte-exact prompts + tool schemas + the verifier receipt');
+    fail(2, 'study-swarm lock <dispatch> requires --from <orchestration.json> — the harness-emitted record of resolved models + text-normalized prompts + tool schemas + the verifier receipt');
   }
   const lock = buildLockObject(dispatch, orchestration);
   writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
@@ -663,19 +730,25 @@ function withdrawnPathFor(dispatch) {
 }
 
 // Recursively collect files matching a regex (delegates to the resilient shared walker).
-function walkByExt(dir, re) { return walkFiles(dir, re); }
+function walkByExt(dir, re, report) { return walkFiles(dir, re, undefined, report); }
 
 // The finding numbers in one dispatch whose citation normalizes to `want` (reuses the lint parser,
 // so Step 3 and the compensator agree on what a citation is).
 function findingsCiting(dispatchPath, want) {
   const res = lintText(dispatchPath, readFileSync(dispatchPath, 'utf8'));
-  return (res.findings || []).filter((f) => f.identifier && normIdent(f.identifier) === want).map((f) => f.finding);
+  return (res.findings || []).filter((f) => {
+    const ids = Array.isArray(f.identifiers) && f.identifiers.length ? f.identifiers : (f.identifier ? [f.identifier] : []);
+    return ids.some((id) => normIdent(id) === want);
+  }).map((f) => f.finding);
 }
 
 // Every dispatch in the corpus citing `target`, with the finding numbers + a content hash each.
 function findDependents(corpus, target) {
   const want = normIdent(target);
-  const files = statSync(corpus).isDirectory() ? walkDispatches(corpus) : [corpus];
+  const report = newWalkReport();
+  const files = statSync(corpus).isDirectory() ? walkDispatches(corpus, report) : [corpus];
+  const blocked = walkBlockedMessage(report);
+  if (blocked) fail(1, blocked);
   const deps = [];
   for (const f of files) {
     const hits = findingsCiting(f, want);
@@ -711,6 +784,8 @@ function loadSidecar(dispatchPath) {
 
 // Recompute the rolled-up hash and write the sidecar; returns the finalized object.
 function writeSidecar(dispatchPath, body) {
+  body.schema = WITHDRAWN_SCHEMA;
+  body.study_swarm_version = VERSION;
   body.dispatch_sha256 = sriText(readFileSync(dispatchPath, 'utf8')); // reconcile to current content
   const finalized = withSha(body, 'withdrawn_sha256');
   writeFileSync(withdrawnPathFor(dispatchPath), JSON.stringify(finalized, null, 2) + '\n', 'utf8');
@@ -813,12 +888,15 @@ function requalifyStatus(args) {
   const corpus = f._[0];
   if (!corpus) fail(2, 'usage: study-swarm requalify --status <corpus-dir> [--json]');
   if (!existsSync(corpus)) fail(2, `corpus not found: ${corpus}`);
-  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i) : [corpus];
+  const walk = newWalkReport();
+  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i, walk) : [corpus];
   const totals = { withdrawn: 0, resolved: 0 };
   const by_reason = {};
   const by_mode = {};
   const dispatches = [];
   const problems = [];
+  const statusBlocked = walkBlockedMessage(walk);
+  if (statusBlocked) problems.push(statusBlocked);
   for (const sc of sidecars) {
     let stored;
     try { stored = JSON.parse(readFileSync(sc, 'utf8')); }
@@ -859,9 +937,12 @@ function requalifyCheck(args) {
   const corpus = f._[0];
   if (!corpus) fail(2, 'usage: study-swarm requalify --check <corpus-dir> [--json]');
   if (!existsSync(corpus)) fail(2, `corpus not found: ${corpus}`);
-  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i) : [corpus];
+  const walk = newWalkReport();
+  const sidecars = statSync(corpus).isDirectory() ? walkByExt(corpus, /\.withdrawn\.json$/i, walk) : [corpus];
   const halts = []; // { sidecar, dispatch, identifier, reason, findings }
   const problems = [];
+  const checkBlocked = walkBlockedMessage(walk);
+  if (checkBlocked) problems.push(checkBlocked);
   let resolvedCount = 0;
   for (const sc of sidecars) {
     let stored;

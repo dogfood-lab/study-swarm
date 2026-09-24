@@ -25,7 +25,7 @@ jobs:
           node-version: '20'
       # Lint every dispatch under dispatches/ (a file, a dir, or '-' for stdin all work).
       # Exit 1 on any sourcing violation fails the check. Add --json for machine-readable output.
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet removed or
       # re-grounded — the canon-rollback andon. Exit 1 on any unresolved evidence-withdrawn flag.
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/

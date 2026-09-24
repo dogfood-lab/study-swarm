@@ -26,7 +26,7 @@
 ## B. Error Handling
 
 - [x] `[all]` Errors are structured (CLI form): prefixed `study-swarm: <message>` on stderr + exit codes; no raw stack traces (2026-06-02)
-- [x] `[cli]` Exit codes: 0 ok/clean · 1 lint violations · 2 usage/runtime error — documented in `--help` (2026-06-02)
+- [x] `[cli]` Exit codes: 0 ok/clean · 1 a gate failed (lint, `lock --verify` drift, or `requalify --check`) · 2 usage/runtime error — documented in `--help` (2026-09-24)
 - [x] `[cli]` No raw stack traces without `--debug` (2026-06-02 — top-level try/catch)
 - [ ] `[mcp]` SKIP: not an MCP server
 - [ ] `[mcp]` SKIP: not an MCP server
