@@ -23,7 +23,7 @@ Applica la propria "medicina". Il protocollo prevede l'utilizzo di verificatori 
 
 1. **Identificare** 3-5 domande progettuali fondamentali su cui le prove empiriche potrebbero cambiare la risposta.
 2. **Attivare** un agente di ricerca per ogni domanda, in parallelo. Ognuno deve restituire titoli degli articoli + autori + anni + URL + una breve sintesi (una frase) — dare priorità alla specificità rispetto all'ampiezza ("6-8 risultati ben documentati sono meglio di 20 affermazioni vaghe").
-3. **Sintetizzare** i risultati in una sezione "Fondamento della ricerca": `N. **<risultato>.** <Autori> <anno> (<arXiv/DOI>). <implicazione progettuale>.`
+3. **Sintetizzare** i risultati in una sezione "Research grounding" (fondamento della ricerca): `N. **<risultato>.** <Autori> <anno> (<arXiv/DOI>). <implicazione progettuale>.`
 4. **Verificare esternamente** — una *famiglia di modelli diversa*, con il ragionamento del generatore nascosto, controlla ogni citazione in due fasi: un **oracolo di recupero** conferma che l'articolo esiste (non si basa mai sulla memoria del modello), quindi una "lente di fondatezza" verifica che il risultato corrisponda alla fonte. **Scartare** un risultato fabbricato; **correggere un'attribuzione errata una volta** e riverificare (un secondo verdetto non pulito lo scarta). **Interrompere e segnalare** solo se il verificatore o l'oracolo di recupero non sono disponibili (non interpretare mai l'assenza come "le citazioni sono corrette").
 5. **Collegare** ogni scelta architettonica a un risultato specifico, tramite numero. Le citazioni prive di implicazioni progettuali sono rumore.
 
