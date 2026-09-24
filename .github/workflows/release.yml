@@ -31,14 +31,14 @@ jobs:
         run: |
           # Node 22 bundles npm 10.x, which cannot do OIDC trusted publishing,
           # and an in-place `npm i -g npm@latest` races its own arborist rebuild.
-          # Install a PINNED npm (>=11.5.1 is the OIDC-TP floor) into an isolated sandbox and
-          # shadow it via PATH. Pinned, not @latest, so this publish step is reproducible and
-          # can't be broken by a bad npm release floating in at tag time.
+          # Install an EXACT npm (11.5.1 is the OIDC trusted-publishing floor) into an isolated
+          # sandbox and shadow it via PATH. Exact, not a caret and not @latest, so this publish
+          # step cannot move when a later 11.x release lands.
           SANDBOX="$HOME/.npm-cli-sandbox"
           mkdir -p "$SANDBOX"
           pushd "$SANDBOX" >/dev/null
           echo '{"name":"npm-cli-sandbox","version":"0.0.0","private":true}' > package.json
-          npm install --no-save --no-audit --no-fund --silent 'npm@^11.5.1'
+          npm install --no-save --no-audit --no-fund --silent 'npm@11.5.1'
           popd >/dev/null
           echo "$SANDBOX/node_modules/.bin" >> "$GITHUB_PATH"
           "$SANDBOX/node_modules/.bin/npm" --version

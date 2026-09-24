@@ -11,7 +11,7 @@ study-swarm is defined as much by what it *prevents* as by what it prescribes. T
 |---|---|---|---|
 | **Fabricated citation** | the arXiv id / DOI resolves to nothing | Step 4, retrieval oracle | drop it — there is no real source to correct |
 | **Misattribution** | a real paper, but the wrong author or year | Step 4, retrieval oracle | correct the attribution and re-verify **once**; a second non-clean verdict drops it |
-| **Groundedness gap** | the link resolves, but the source never makes the claim | Step 4, groundedness lens | rewrite the finding to what the source *actually* says, or drop it |
+| **Groundedness gap** | the link resolves, but the source never makes the claim | Step 4, groundedness lens | correct the finding to what the source supports and re-verify **once**, or escalate — never auto-passed |
 | **Self-grading** | the model that synthesized the design also "verifies" it | Step 4, different-family rule | a verifier of a **different model family**, reasoning-stripped — never the generator |
 | **Postdated-paper false-flag** | an LLM declares a real 2026 paper "fabricated" because it postdates training | the retrieval-oracle requirement | check existence by **retrieval, not recall** — an LLM cannot know a paper it never saw |
 | **Question padding** | five "load-bearing" questions, but only two would change a design | Step 1 | run 1–2 agents on the questions that matter; don't manufacture questions to hit a count |

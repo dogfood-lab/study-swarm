@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- `lint` keeps every identifier on a finding. A URL earlier in the sentence no longer hides a later arXiv, DOI, or RFC from `withdraw` and from `requalify --resolve --mode removed`.
+- An unclosed code fence in Research grounding fails the lint. The lines after it are not treated as clean.
+- Finding numbers are the integers written on the markdown items, not the position in the list.
+- The author check allows one comma before the year (`Smith, 2024`, `Huang et al., 2023`) and rejects a bare function word (`The 2024`).
+- A directory walk that cannot list a directory, or that skips a symlink or junction which might hide a dispatch or a tombstone, fails `lint`, `withdraw`, and `requalify --check` instead of reporting a clean corpus.
+- `lock` requires `resolved_model` and `prompt` to be strings. A caller-supplied `output_sha256` must be 32 bytes. When the step also includes `output`, the digest must match those bytes.
+- `withdraw` and `requalify --resolve` rewrite a sidecar to schema `dispatch.withdrawn/v2` before hashing it, so a resolved v1 sidecar does not stay permanently red.
+- Help, the lock template, the README, and PROTOCOL.md call the prompt digest text-normalized (BOM stripped, newlines folded to LF, NFC), which is what the hasher does.
+- The canon-rollback example no longer states Hsiao & Schneider 2021 as a finding. The pinned run recorded `retrieved: false`. The paper is real; it is not canon in a dispatch whose own evidence did not retrieve it.
+- The lock example's shape sample shows schema v2. The sample CI workflow pins `@dogfood-lab/study-swarm@2.0.0` instead of `@latest`. The release workflow installs `npm@11.5.1` exactly.
+- SECURITY.md reports issues on GitHub and lists the lock, tombstone, and receipt writes. The handbook halt table and three broken handbook links match the protocol. SHIP_GATE's exit code 1 includes lock drift and `requalify --check`.
+
 ## [2.0.0] — 2026-07-05
 
 A full dogfood-swarm pass — health hardening, a feature pass making more of the protocol executable, and a security hardening of the lock's content-addressing. **The breaking change** (hence the major bump): the `dispatch.lock.json` / tombstone / receipt hash format is now domain-separated (artifact schema **v2**), so a lock written by an earlier version (≤ 1.3) no longer verifies until it is regenerated (`study-swarm lock <dispatch> --from <orchestration.json>`) — `lock --verify` now says exactly that, instead of reporting a confusing hash mismatch. The CLI's command surface is otherwise fully backward-compatible and additive.

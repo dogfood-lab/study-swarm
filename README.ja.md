@@ -82,7 +82,7 @@ npm i -g @dogfood-lab/study-swarm     # or run ad-hoc: npx @dogfood-lab/study-sw
 | `study-swarm withdraw <id> --reason <reason> [--from <dir>] [--receipt <path>]` | **カノンロールバック補正器**。コーパス内のすべてのディスパッチについて、「研究根拠」で `<id>` を引用しているものを `evidence-withdrawn` としてフラグ付けします（墓石のようなサイドカーファイル `<slug>.withdrawn.json` で、フラグを立てますが削除はしません）。また、コンテンツアドレス指定された取り下げレシートを出力します。`--reason` は `fabricated · misattributed · retracted · verifier-flipped · other` のいずれかです。 |
 | `study-swarm requalify --check <corpus-dir>` | 未解決の `evidence-withdrawn` フラグを持つディスパッチがある場合、処理を停止してエラー (`1`) を返します。これは、取り下げられた調査結果に依存するものを、削除または再検証されるまで停止させるための「アンドン」です。CI のゲートとしても機能します。 |
 | `study-swarm requalify --status <corpus-dir> [--json]` | コーパスの読み取り専用の証拠健全性**ビュー**を提供します。取り下げられたものと解決されたものの数、理由および解決モードごとの内訳、ディスパッチごとの行を表示します。これは情報提供のみを目的としており（`0` を返します）、`--check` ゲートとは異なります。 |
-| `study-swarm requalify --resolve <dispatch> <id> --mode removed\ | regrounded [--note …]` | 調査結果が削除されたとき（引用がなくなったとき）または再検証されたときに、フラグをクリアします（兄弟ランナーによって再度検証され、問題がないことが確認されます。`--note` には証拠が記録されます）。べき等であり、サイドカーの監査ログに追加されます。 |
+| `study-swarm requalify --resolve <dispatch> <id> --mode removed\|regrounded [--note …]` | 調査結果が削除されたとき（引用がなくなったとき）または再検証されたときに、フラグをクリアします（兄弟ランナーによって再度検証され、問題がないことが確認されます。`--note` には証拠が記録されます）。べき等であり、サイドカーの監査ログに追加されます。 |
 
 `lint`は決定論的であり、モデル呼び出しはゼロであるため、CIでの使用に安全です。ローカルで**ステップ3のソース標準**を適用し、モデルベースの**ステップ4**検証は引き続き[`roleos verify-citations`](https://github.com/mcp-tool-shop-org/role-os) → prismに委ねます。
 
