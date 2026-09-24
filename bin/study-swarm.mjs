@@ -165,14 +165,16 @@ const AUTHOR = /\p{Lu}[\p{L}.'’-]+(?:,?\s+(?:&|and|et al\.?|\p{Lu}[\p{L}.'’-
 // A single function word before a year is not an author ("The 2024"). A name, "et al.", or a
 // multi-word organization still is. Checked after the regex so the stop-list cannot reintroduce
 // the empty-match backtracking the quantified group above was rewritten to avoid.
-const AUTHOR_STOP = new Set('The A An This That These Those It Its In On For With From And But Or Of To As At By We Our'.split(' '));
+const AUTHOR_STOP = new Set('the a an this that these those it its in on for with from and but or of to as at by we our'.split(' '));
 function authorOk(text) {
-  const m = AUTHOR.exec(text);
-  if (!m) return false;
-  const phrase = m[0].replace(/(?:,\s*|\s+)\(?((?:19|20)\d{2})\s*$/, '').trim();
-  const words = phrase.split(/\s+/).map((w) => w.replace(/[.,]$/, ''));
-  if (words.length === 1 && AUTHOR_STOP.has(words[0])) return false;
-  return true;
+  const re = new RegExp(AUTHOR.source, 'gu');
+  for (const m of text.matchAll(re)) {
+    const phrase = m[0].replace(/(?:,\s*|\s+)\(?((?:19|20)\d{2})\s*$/, '').trim();
+    const words = phrase.split(/\s+/).map((w) => w.replace(/[.,]+$/u, '').replace(/(?:['’]s)$/iu, ''));
+    const bareStop = words.length === 1 && AUTHOR_STOP.has(words[0].toLowerCase());
+    if (!bareStop) return true;
+  }
+  return false;
 }
 
 // --- strict mode: Step-5 connection / orphan-citation check (opt-in --strict) --------------
@@ -273,7 +275,7 @@ function lintText(label, raw, strict) {
     // or DOI from withdraw / requalify --resolve --mode removed.
     const identifiers = [];
     for (const m of f.text.matchAll(new RegExp(ID.source, 'gi'))) {
-      identifiers.push(m[0].replace(/\s+/g, '').replace(/[).,;]+$/, ''));
+      identifiers.push(cleanIdent(m[0]));
     }
     if (identifiers.length === 0) add('missing-id', `finding ${n}: missing an identifier (arXiv:NNNN.NNNNN, DOI, URL, or RFC number).`, f.line, n);
     const ym = fNoIds.match(YEAR);
@@ -530,6 +532,9 @@ function buildLockObject(dispatchPath, orchestration) {
     // A caller-supplied digest is validated to the SRI sha256- shape here, so a malformed hash is
     // rejected where it enters rather than mis-surfacing as "drift" on a later verify (PH-05).
     const hashed = s.output !== undefined ? (typeof s.output === 'string' ? sriText(s.output) : jcsDigest(s.output)) : null;
+    if (s.output_sha256 !== undefined && typeof s.output_sha256 !== 'string') {
+      fail(2, `orchestration step ${i + 1} output_sha256 must be a string`);
+    }
     if (typeof s.output_sha256 === 'string') {
       if (!sha256DigestOk(s.output_sha256)) {
         fail(2, `orchestration step ${i + 1} output_sha256 is not a sha256 digest of 32 bytes: "${s.output_sha256}"`);
@@ -711,12 +716,23 @@ const WITHDRAW_REASONS = ['fabricated', 'misattributed', 'retracted', 'verifier-
 // URL), RFC (RFC NNNN / rfc-editor / datatracker), else a trimmed lowercased URL. Used on BOTH the
 // dispatch's extracted identifier and the user's <identifier> argument so `withdraw arXiv:2402.15089`
 // flags a finding citing `https://arxiv.org/abs/2402.15089v2` (C2).
+// Peel markdown wrappers off an identifier's edges so `<https://…>` and `**10.x/y**` match the
+// bare DOI or URL a caller passes to withdraw. Loops because wrappers nest (`**<url>**`).
+function cleanIdent(raw) {
+  let s = String(raw || '').replace(/\s+/g, '');
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/^[<*_`"'\u201c\u2018\[]+/, '').replace(/[>*_`"'\u201d\u2019\]).,;]+$/, '');
+  } while (s !== prev && s.length);
+  return s;
+}
 function normIdent(raw) {
-  let s = String(raw || '').trim().toLowerCase().replace(/[).,;]+$/, '');
+  let s = cleanIdent(raw).toLowerCase();
   let m = s.match(/arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/) || s.match(/arxiv:\s*(\d{4}\.\d{4,5})/);
   if (m) return 'arxiv:' + m[1];
   m = s.match(/(?:doi\.org\/|dx\.doi\.org\/|doi:\s*)?(10\.\d{4,9}\/\S+)/);
-  if (m) return 'doi:' + m[1].replace(/[).,;]+$/, '');
+  if (m) return 'doi:' + cleanIdent(m[1]).toLowerCase();
   m = s.match(/rfc[\s/-]?(\d{3,5})/);
   if (m) return 'rfc:' + m[1];
   return s.replace(/\/+$/, '');
@@ -736,6 +752,9 @@ function walkByExt(dir, re, report) { return walkFiles(dir, re, undefined, repor
 // so Step 3 and the compensator agree on what a citation is).
 function findingsCiting(dispatchPath, want) {
   const res = lintText(dispatchPath, readFileSync(dispatchPath, 'utf8'));
+  if ((res.problems || []).some((p) => p.rule === 'unclosed-fence')) {
+    fail(1, `${dispatchPath}: Research grounding has an unclosed code fence, so citations after it were not scanned. Refusing to treat them as absent.`);
+  }
   return (res.findings || []).filter((f) => {
     const ids = Array.isArray(f.identifiers) && f.identifiers.length ? f.identifiers : (f.identifier ? [f.identifier] : []);
     return ids.some((id) => normIdent(id) === want);
