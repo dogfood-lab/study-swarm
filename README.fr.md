@@ -106,7 +106,7 @@ Quatre documents complets et validés sont fournis en tant que références : [
 name: study-swarm lint
 on:
   pull_request:
-    paths: ['**/*.dispatch.md', '.github/workflows/dispatches.yml']
+    paths: ['**/*.dispatch.md', '**/*.withdrawn.json', '.github/workflows/dispatches.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '**/*.dispatch.md'
+      - '**/*.withdrawn.json'
       - '.github/workflows/dispatches.yml'
   workflow_dispatch:
 

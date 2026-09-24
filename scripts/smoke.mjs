@@ -150,6 +150,27 @@ try {
     writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (<https://doi.org/10.1000/xyz182>). Impl.\n');
     eq(run(['withdraw', '10.1000/xyz182', '--reason', 'retracted', '--from', d]).code, 0, 'withdraw');
   });
+  check('lint keeps findings under a subheading inside Research grounding', () => {
+    const p = lintFile('subhead.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n\n### More\n2. **G.** Kim 2025 (arXiv:2506.07962). Impl.\nstudies show this.\n');
+    const r = run(['lint', '--json', p]);
+    eq(r.code, 1, 'exit');
+    const obj = JSON.parse(r.stdout);
+    if (obj.findingCount !== 2) throw new Error('subheading hid a finding');
+    if (!obj.problems.some((x) => x.rule === 'banned-gesture')) throw new Error('gesture under the subheading was not checked');
+  });
+  check('withdraw matches a DOI URL that has a trailing slash', () => {
+    const d = join(work, 'doislash'); mkdirSync(d);
+    writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (https://doi.org/10.1000/xyz182/). Impl.\n');
+    eq(run(['withdraw', '10.1000/xyz182', '--reason', 'retracted', '--from', d]).code, 0, 'withdraw');
+  });
+  check('requalify --check names a null withdrawal instead of crashing', () => {
+    const d = join(work, 'nullw'); mkdirSync(d);
+    writeFileSync(join(d, 'a.withdrawn.json'), JSON.stringify({ schema: 'dispatch.withdrawn/v2', withdrawals: [null] }));
+    const r = run(['requalify', '--check', d]);
+    eq(r.code, 1, 'exit');
+    if (/Cannot read properties/.test(r.stderr)) throw new Error(r.stderr);
+    if (!/not an object/.test(r.stderr)) throw new Error(r.stderr);
+  });
   check('withdraw refuses an unclosed fence instead of reporting the citation absent (exit 1)', () => {
     const d = join(work, 'fencewd'); mkdirSync(d);
     writeFileSync(join(d, 'a.dispatch.md'), '# d\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n```\nalso arXiv:2402.15089\n');
@@ -179,7 +200,10 @@ try {
     const real = join(d, 'real.dispatch.md');
     writeFileSync(real, '# d\n\n## Research grounding\n1. **F.** 2024 (arXiv:2310.01798).\n');
     try { symlinkSync(real, join(sub, 'via.dispatch.md')); }
-    catch (e) { if (e && (e.code === 'EPERM' || e.code === 'ENOTSUP')) return; throw e; }
+    catch (e) {
+      if (e && (e.code === 'EPERM' || e.code === 'ENOTSUP')) throw new Error('symlink could not be created, so this check did not run');
+      throw e;
+    }
     const r = run(['lint', sub]);
     eq(r.code, 1, 'exit');
     if (!/refusing a clean result/.test(r.stderr)) throw new Error(r.stderr);
@@ -413,6 +437,15 @@ try {
     const r = run(['lock', dp, '--from', op]);
     eq(r.code, 2, 'exit');
     if (!/does not match/.test(r.stderr)) throw new Error(r.stderr);
+  });
+  check('lock rejects a tool_schema that is not a JSON object (exit 2)', () => {
+    const d = join(work, 'badschema'); mkdirSync(d, { recursive: true });
+    const dp = join(d, 'x.dispatch.md'); writeFileSync(dp, DISPATCH_TEXT);
+    const op = join(d, 'x.orchestration.json');
+    writeFileSync(op, JSON.stringify({ steps: [{ question_id: 'Q1', resolved_model: 'm', prompt: 'P', tool_schema: 'not-a-schema' }] }));
+    const r = run(['lock', dp, '--from', op]);
+    eq(r.code, 2, 'exit');
+    if (!/tool_schema must be a JSON object/.test(r.stderr)) throw new Error(r.stderr);
   });
   check('lock rejects a non-string output_sha256 (exit 2)', () => {
     const d = join(work, 'objhash'); mkdirSync(d, { recursive: true });
