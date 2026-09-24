@@ -96,12 +96,12 @@ Each choice traces to findings by number. The shape:
   "schema": "dispatch.lock/v2",
   "study_swarm_version": "2.0.0",
   "protocol_sha256": "sha256-<base64 of the tag study-swarm/v2/text plus a newline, then the text-normalized PROTOCOL.md>",
-  "dispatch_sha256": "sha256-<base64 of that same tag plus the text-normalized dispatch>",
+  "dispatch_sha256": "sha256-<base64 of the tag study-swarm/v2/text, a newline, then the text-normalized dispatch>",
   "steps": [
     {
       "question_id": "Q1-replay-manifest",
       "resolved_model": "claude-opus-4-8",
-      "prompt_sha256": "sha256-<base64 of that same tag plus the text-normalized prompt>",
+      "prompt_sha256": "sha256-<base64 of the tag study-swarm/v2/text, a newline, then the text-normalized prompt>",
       "tool_schema_sha256": "sha256-<base64>",
       "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
       "params": { "effort": "high" },

@@ -22,6 +22,7 @@ All notable changes to this project are documented here. The format is based on 
 - The five-step list drops a fabricated finding and corrects a misattribution once. Halt-and-escalate is only when the verifier or the oracle is unavailable. Spanish, Portuguese, and Hindi `--reason` values are the English tokens the CLI accepts, with a gloss beside them. Translated lock rows call the prompt digest text-normalized.
 - The sample CI workflow, and the copies in the README and handbook, also run `requalify --check` when a pull request only touches a `.withdrawn.json`. The lock example states the digest preimage as the `study-swarm/v2/text` tag plus the normalized text. `tool_schema` must be a JSON object. The symlink smoke check fails if the link cannot be created, instead of passing.
 - Translated READMEs keep the heading `Research grounding`. That English phrase is what `lint` and `withdraw` match. A gloss sits beside it.
+- The lock example's `dispatch_sha256` and `prompt_sha256` lines name the same preimage as `protocol_sha256`: the tag `study-swarm/v2/text`, a newline, then the normalized text.
 - A subheading inside Research grounding does not end the section. A trailing slash on a DOI URL is the same identifier as the bare DOI. `question_id`, `schema_dialect`, `params`, and `verification` are rejected when the type is wrong, not coerced or dropped. `requalify --resolve` refuses a hand-edited sidecar. A null withdrawal entry is a named problem, not a crash. The release workflow does not cancel an in-progress npm publish.
 
 ## [2.0.0] — 2026-07-05
