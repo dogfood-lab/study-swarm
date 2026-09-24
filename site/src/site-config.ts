@@ -62,7 +62,7 @@ export const config: SiteConfig = {
         },
         {
           title: 'Verify the citations',
-          code: '# different family, reasoning-stripped,\n# retrieval-oracle existence floor\nroleos verify-citations <dispatch>\n#  → prism verify --type citations',
+          code: '# different family, reasoning-stripped,\n# retrieval-oracle existence floor\nroleos verify-citations &lt;dispatch&gt;\n#  → prism verify --type citations',
         },
         {
           title: 'Pin + roll back',
