@@ -191,6 +191,20 @@ try {
     const p = lintFile('comma.dispatch.md', '# d\n\n## Research grounding\n1. **F.** Smith, 2024 (arXiv:2310.01798). Impl.\n2. **G.** Huang et al., 2023 (arXiv:2402.01817). Impl.\n');
     eq(run(['lint', p]).code, 0, 'exit');
   });
+  check('return writes a sheet and a kept record, and --check fails after the dispatch changes', () => {
+    const p = lintFile('ret.dispatch.md', '# Return me\n\n## Research grounding\n1. **F.** Huang et al. 2023 (arXiv:2310.01798). The foil helps.\n');
+    eq(run(['return', p]).code, 0, 'write');
+    const jsonPath = p.replace(/\.dispatch\.md$/, '.results.json');
+    const mdPath = p.replace(/\.dispatch\.md$/, '.results.md');
+    if (!existsSync(jsonPath) || !existsSync(mdPath)) throw new Error('missing results files');
+    const rec = JSON.parse(readFileSync(jsonPath, 'utf8'));
+    if (rec.schema !== 'study-swarm.results/v1' || rec.findings.length !== 1) throw new Error('bad record');
+    if (!/2310\.01798/.test(rec.findings[0].identifier || '')) throw new Error(rec.findings[0].identifier);
+    if (!readFileSync(mdPath, 'utf8').includes(rec.results_sha256)) throw new Error('sheet missing the kept hash');
+    eq(run(['return', '--check', p]).code, 0, 'check');
+    writeFileSync(p, readFileSync(p, 'utf8') + '\n');
+    eq(run(['return', '--check', p]).code, 1, 'drift');
+  });
   check('lint uses the markdown finding number, not the list index', () => {
     const body = '# d\n\n## Research grounding\n2. **A.** Huang et al. 2023 (arXiv:2310.01798). Impl.\n4. **B.** Kim 2025 (arXiv:2506.07962). Impl.\n\n## Step 5 — Architecture\n- **C1.** (findings 2, 4)\n';
     const r = run(['lint', '--json', '--strict', lintFile('nums.dispatch.md', body)]);
