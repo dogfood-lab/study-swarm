@@ -15,7 +15,8 @@ The methodology *describes* a workflow that uses web retrieval and model-based v
 
 | Version | Supported |
 |---------|-----------|
-| 1.x     | ✅        |
+| 2.x     | ✅        |
+| 1.x     | commands still run; regenerate v1 locks |
 | < 1.0   | —         |
 
 ## Reporting

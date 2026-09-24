@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### Enregistre une analyse pour la relecture (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## Sécurité
 
-`study-swarm` fournit une **CLI légère et sans dépendances** (`study-swarm`) en plus de la méthodologie. Il n’effectue **aucune requête réseau ou vers le modèle** et ne collecte **aucune télémétrie** ; il n’y a pas de secrets ni d’identifiants dans le code source. Au moment de l’exécution, il lit uniquement le fichier que vous transmettez à `lint` et écrit un seul fichier `<slug>.dispatch.md` dans le répertoire courant pour `new` (il refuse d’écraser les fichiers et ne fonctionne jamais en dehors du répertoire de travail). La vérification basée sur le modèle décrite par la méthodologie (étape 4) est effectuée par les outils associés, et non par ce paquet. Voir [SECURITY.md](SECURITY.md).
+`study-swarm` fournit une **CLI légère et sans dépendances** (`study-swarm`) en plus de la méthodologie. Il n’effectue **aucune requête réseau ou vers le modèle** et ne collecte **aucune télémétrie** ; il n’y a pas de secrets ni d’identifiants dans le code source. À l’exécution, il lit les fichiers que vous nommez. `new` écrit un seul `<slug>.dispatch.md` dans le répertoire de travail (sans écraser, et sans en sortir). `lock`, `withdraw` et `requalify` écrivent aussi un lock, un sidecar tombstone et, avec `--receipt`, un reçu au chemin indiqué. La vérification basée sur le modèle décrite par la méthodologie (étape 4) est effectuée par les outils associés, et non par ce paquet. Voir [SECURITY.md](SECURITY.md).
 
 ## État actuel
 

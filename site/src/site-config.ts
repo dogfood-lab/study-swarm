@@ -66,7 +66,7 @@ export const config: SiteConfig = {
         },
         {
           title: 'Pin + roll back',
-          code: '# pin a verified dispatch for byte-replay\nstudy-swarm lock d.dispatch.md --from d.orchestration.json\n\n# a citation was retracted? roll it back across every dependent\nstudy-swarm withdraw arXiv:2402.15089 --reason retracted --from dispatches/\nstudy-swarm requalify --check dispatches/   # halts until resolved',
+          code: '# pin a verified dispatch (text-normalized prompt hash)\nstudy-swarm lock d.dispatch.md --from d.orchestration.json\n\n# a citation was retracted? roll it back across every dependent\nstudy-swarm withdraw arXiv:2402.15089 --reason retracted --from dispatches/\nstudy-swarm requalify --check dispatches/   # halts until resolved',
         },
       ],
     },
@@ -78,7 +78,7 @@ export const config: SiteConfig = {
       columns: ['Command', 'What it does'],
       rows: [
         ['study-swarm lint [--strict]', 'Check a dispatch’s sourcing — author + year + a resolvable arXiv/DOI/URL/RFC. --strict also flags orphan citations. Gates CI.'],
-        ['study-swarm lock / lock --verify', 'Pin a dispatch for replay — resolved model + byte-exact prompt + tool-schema hashes + the verifier receipt; --verify fails closed on any drift.'],
+        ['study-swarm lock / lock --verify', 'Pin a dispatch for replay — resolved model + text-normalized prompt hash + tool-schema hashes + the verifier receipt; --verify fails closed on any drift.'],
         ['study-swarm withdraw', 'Canon-rollback: flag every dispatch citing a withdrawn finding (a tombstone sidecar — flag, never delete) with a content-addressed receipt.'],
         ['study-swarm requalify --check / --status', 'Halt the dependents of an unresolved withdrawn finding (--check, the andon), or read a corpus’s evidence health (--status).'],
       ],

@@ -119,10 +119,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npx @dogfood-lab/study-swarm@latest lint dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 lint dispatches/
       # Halt the build while any finding that became canon is withdrawn and not yet
       # removed or re-grounded — the canon-rollback andon (exit 1 on any unresolved flag).
-      - run: npx @dogfood-lab/study-swarm@latest requalify --check dispatches/
+      - run: npx --yes @dogfood-lab/study-swarm@2.0.0 requalify --check dispatches/
 ```
 
 ### किसी प्रेषण को फिर से चलाने के लिए पिन करें (`dispatch.lock.json`)
@@ -151,7 +151,7 @@ study-swarm requalify --resolve d.dispatch.md arXiv:2402.15089 --mode removed   
 
 ## सुरक्षा
 
-`study-swarm` एक **पतली, शून्य-निर्भरता CLI** (`study-swarm`) को पद्धति के साथ भेजता है। यह **कोई नेटवर्क या मॉडल कॉल नहीं करता है** और **कोई टेलीमेट्री एकत्र नहीं करता है**; स्रोत में कोई गुप्त जानकारी या क्रेडेंशियल नहीं हैं। रनटाइम पर यह केवल उस फ़ाइल को पढ़ता है जिसे आप `lint` में पास करते हैं और वर्तमान निर्देशिका में एक एकल `<slug>.dispatch.md` लिखते हैं (ओवरराइट करने से इनकार करते हुए, और कभी भी कार्यशील निर्देशिका के बाहर नहीं)। पद्धति द्वारा वर्णित मॉडल-आधारित सत्यापन (चरण 4) इस पैकेज द्वारा नहीं, बल्कि संबंधित उपकरणों द्वारा किया जाता है। [SECURITY.md](SECURITY.md) देखें।
+`study-swarm` एक **पतली, शून्य-निर्भरता CLI** (`study-swarm`) को पद्धति के साथ भेजता है। यह **कोई नेटवर्क या मॉडल कॉल नहीं करता है** और **कोई टेलीमेट्री एकत्र नहीं करता है**; स्रोत में कोई गुप्त जानकारी या क्रेडेंशियल नहीं हैं। रनटाइम पर यह उन फ़ाइलों को पढ़ता है जिन्हें आप नाम देते हैं। `new` कार्य निर्देशिका में एक `<slug>.dispatch.md` लिखता है (ओवरराइट नहीं, और निर्देशिका के बाहर नहीं)। `lock`, `withdraw`, और `requalify` एक lock फ़ाइल, एक टूम्बस्टोन sidecar, और `--receipt` देने पर उस पथ पर एक रसीद भी लिखते हैं। पद्धति द्वारा वर्णित मॉडल-आधारित सत्यापन (चरण 4) इस पैकेज द्वारा नहीं, बल्कि संबंधित उपकरणों द्वारा किया जाता है। [SECURITY.md](SECURITY.md) देखें।
 
 ## स्थिति
 
