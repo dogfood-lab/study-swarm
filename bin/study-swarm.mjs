@@ -774,6 +774,18 @@ function normIdent(raw) {
 
 // The tombstone sits beside its dispatch: <dir>/<stem>.withdrawn.json (C4 — status travels WITH
 // the artifact, the OCSP-stapling property; stem strips a trailing .dispatch.md).
+function shQuote(s) {
+  const t = String(s);
+  return /[\s"]/.test(t) ? `"${t.replace(/"/g, '\\"')}"` : t;
+}
+function resolveCommands(dispatchPath, identifier) {
+  const d = shQuote(dispatchPath);
+  const id = shQuote(identifier);
+  return [
+    `study-swarm requalify --resolve ${d} ${id} --mode removed`,
+    `study-swarm requalify --resolve ${d} ${id} --mode regrounded --note "<attestation>"`,
+  ];
+}
 function openableDispatch(sidecarPath, storedName) {
   const name = String(storedName || '');
   if (!name) return sidecarPath;
@@ -930,10 +942,14 @@ function cmdWithdraw(args) {
   }
   // Contrastive surfacing — never a silent drop (C10; Buçinca 2024, Bansal 2021).
   process.stdout.write(`Withdrew ${want} (reason: ${f.reason}). ${dependents.length} dependent(s) flagged evidence-withdrawn:\n`);
-  for (const d of dependents) process.stdout.write(`  - ${d.path || d.dispatch} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
+  for (const d of dependents) {
+    const where = d.path || d.dispatch;
+    process.stdout.write(`  - ${where} (findings ${d.findings.map((n) => '#' + n).join(', ')})\n`);
+    for (const cmd of resolveCommands(where, want)) process.stdout.write(`    ${cmd}\n`);
+  }
   process.stdout.write(
     `\nYou may have relied on this finding. Each flagged dispatch now HALTS "study-swarm requalify --check"\n` +
-    `until you clear it: delete the citation and re-run requalify --resolve --mode removed, or re-run --mode regrounded --note "<attestation>".\n` +
+    `until you run one of the commands above. Delete the citation before --mode removed.\n` +
     `${f.receipt ? `Receipt written to ${String(f.receipt)}` : 'No receipt file written — re-run with --receipt <path> or --json to capture it'} — receipt_sha256 ${receipt.receipt_sha256}\n`);
   process.exit(0);
 }
@@ -1046,7 +1062,10 @@ function requalifyCheck(args) {
   }
   if (halts.length) process.stderr.write(`x requalify --check ${corpus}: ${halts.length} unresolved evidence-withdrawn flag(s) — HALT\n`);
   else process.stderr.write(`x requalify --check ${corpus}: ${problems.length} problem(s) — the check could not trust the corpus\n`);
-  for (const h of halts) process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it. Clear it with requalify --resolve --mode removed after the citation is gone, or --mode regrounded --note "<attestation>".\n`);
+  for (const h of halts) {
+    process.stderr.write(`  - ${h.dispatch}: ${h.identifier} withdrawn (reason: ${h.reason}) — findings ${(h.findings || []).map((n) => '#' + n).join(', ')}. You may have relied on it.\n`);
+    for (const cmd of resolveCommands(h.dispatch, h.identifier)) process.stderr.write(`    ${cmd}\n`);
+  }
   for (const p of problems) process.stderr.write(`  - ${p}\n`);
   process.exit(1);
 }
