@@ -19,6 +19,11 @@ USAGE
 COMMANDS
   protocol                 Print the locked protocol (the five steps + halt rules).
   new <slug>               Scaffold a dispatch file <slug>.dispatch.md to fill in.
+  return <dispatch> [--check]
+                           Write the results of a dispatch: a sheet you can hand someone
+                           (<stem>.results.md) and the same facts kept beside it
+                           (<stem>.results.json) for the next run to open. --check fails
+                           if either copy has drifted from the dispatch.
   lint [--json] [--strict] <path...>
                            Check dispatches' citations against the sourcing standard.
                            A <path> may be a file, a directory (linted recursively for
@@ -1110,12 +1115,146 @@ function requalifyResolve(args) {
   process.exit(0);
 }
 
+const RESULTS_SCHEMA = 'study-swarm.results/v1';
+
+function resultsPaths(dispatch) {
+  const base = dispatch.split(/[\\/]/).pop().replace(/(\.dispatch)?\.md$/i, '');
+  return {
+    md: join(dirname(dispatch), `${base}.results.md`),
+    json: join(dirname(dispatch), `${base}.results.json`),
+  };
+}
+
+function firstHeading(raw) {
+  const m = raw.match(/^#{1,6}\s+(.*?)\s*$/m);
+  return m ? m[1].replace(/\*\*/g, '').trim() : '';
+}
+
+function sentenceOf(raw, n) {
+  for (const line of raw.split(/\r?\n/)) {
+    const m = new RegExp('^\\s*' + n + '\\.\\s+(.*)$').exec(line);
+    if (m) return m[1].replace(/\*\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 280);
+  }
+  return '';
+}
+
+function buildResults(dispatchPath) {
+  const raw = readFileSync(dispatchPath, 'utf8');
+  const lint = lintText(dispatchPath, raw, false);
+  const lines = raw.split(/\r?\n/);
+  const body = step5Body(lines);
+  const connected = body === null ? [] : [...referencedNumbers(body)].sort((a, b) => a - b);
+  let lock = { present: false };
+  const lp = lockPathFor(dispatchPath);
+  if (existsSync(lp)) {
+    try {
+      const obj = JSON.parse(readFileSync(lp, 'utf8'));
+      lock = { present: true, schema: obj.schema || null, lock_sha256: obj.lock_sha256 || null };
+    } catch { lock = { present: true, unreadable: true }; }
+  }
+  let withdrawn = [];
+  const sp = withdrawnPathFor(dispatchPath);
+  if (existsSync(sp)) {
+    try {
+      const side = JSON.parse(readFileSync(sp, 'utf8'));
+      withdrawn = (side.withdrawals || []).filter((w) => w && typeof w === 'object').map((w) => ({
+        identifier: w.identifier || null,
+        status: w.status || null,
+        reason: w.reason || null,
+      }));
+    } catch { withdrawn = [{ identifier: null, status: 'unreadable', reason: null }]; }
+  }
+  const record = {
+    schema: RESULTS_SCHEMA,
+    study_swarm_version: VERSION,
+    dispatch: dispatchPath.split(/[\\/]/).pop(),
+    dispatch_sha256: sriText(raw),
+    title: firstHeading(raw),
+    lint: {
+      ok: lint.ok,
+      finding_count: lint.findingCount,
+      problems: (lint.problems || []).map((p) => ({ rule: p.rule, message: p.message })),
+    },
+    findings: (lint.findings || []).map((f) => ({
+      finding: f.finding,
+      year: f.year,
+      identifier: f.identifier,
+      identifiers: f.identifiers || [],
+      line: sentenceOf(raw, f.finding),
+    })),
+    step5_finding_numbers: connected,
+    lock,
+    withdrawn,
+  };
+  return withSha(record, 'results_sha256');
+}
+
+function renderResultsMd(rec, jsonName) {
+  const out = [];
+  out.push(`# ${rec.title || rec.dispatch}`);
+  out.push('');
+  out.push(`Dispatch \`${rec.dispatch}\` (\`${rec.dispatch_sha256}\`). Lint ${rec.lint.ok ? 'clean' : 'failed'}, ${rec.lint.finding_count} finding(s).`);
+  out.push(rec.lock.present && rec.lock.lock_sha256 ? `Lock \`${rec.lock.lock_sha256}\`.` : 'No lock beside this dispatch.');
+  if (rec.withdrawn.length) {
+    out.push('Withdrawn:');
+    for (const w of rec.withdrawn) out.push(`- ${w.identifier} — ${w.status} (${w.reason})`);
+  } else out.push('No withdrawal flags.');
+  out.push('');
+  out.push('## Findings');
+  out.push('');
+  if (!rec.findings.length) out.push('No numbered findings.');
+  for (const f of rec.findings) {
+    out.push(`${f.finding}. ${f.year || 'no year'} — ${f.identifier || 'no identifier'}`);
+    if (f.line) out.push(`   ${f.line}`);
+    out.push('');
+  }
+  if (rec.lint.problems.length) {
+    out.push('## Lint problems');
+    out.push('');
+    for (const p of rec.lint.problems) out.push(`- ${p.rule}: ${p.message}`);
+    out.push('');
+  }
+  out.push('## Kept record');
+  out.push('');
+  out.push(`This sheet is the copy to hand someone. The same facts are kept in \`${jsonName}\` (\`${rec.results_sha256}\`). A later run opens that file. \`study-swarm return --check ${rec.dispatch}\` fails if either copy has drifted from the dispatch.`);
+  out.push('');
+  return out.join('\n');
+}
+
+function cmdReturn(args) {
+  const check = args.includes('--check');
+  const dispatch = args.filter((a) => a !== '--check')[0];
+  if (!dispatch) fail(2, 'usage: study-swarm return <dispatch> [--check]');
+  if (!existsSync(dispatch)) fail(2, `dispatch not found: ${dispatch}`);
+  const rec = buildResults(dispatch);
+  const paths = resultsPaths(dispatch);
+  const jsonName = paths.json.split(/[\\/]/).pop();
+  const md = renderResultsMd(rec, jsonName);
+  if (!check) {
+    writeFileSync(paths.json, JSON.stringify(rec, null, 2) + '\n', 'utf8');
+    writeFileSync(paths.md, md, 'utf8');
+    process.stdout.write(`Results for ${rec.dispatch}: ${paths.md}\nKept record: ${paths.json} (${rec.results_sha256})\n`);
+    process.exit(0);
+  }
+  if (!existsSync(paths.json) || !existsSync(paths.md)) fail(2, `no results beside ${dispatch} — run study-swarm return ${dispatch}`);
+  let kept;
+  try { kept = JSON.parse(readFileSync(paths.json, 'utf8')); }
+  catch (err) { fail(2, `cannot read ${paths.json}: ${err.message}`); }
+  const sheet = readFileSync(paths.md, 'utf8');
+  if (kept.results_sha256 !== rec.results_sha256 || !sheet.includes(rec.results_sha256)) {
+    fail(1, `${jsonName}: results have drifted from ${dispatch}. Re-run study-swarm return ${dispatch}.`);
+  }
+  process.stdout.write(`ok ${jsonName}: ${rec.results_sha256}\n`);
+  process.exit(0);
+}
+
 function main(argv) {
   const [cmd, ...rest] = argv;
   switch (cmd) {
     case 'protocol': return cmdProtocol();
     case 'new': return cmdNew(rest[0]);
     case 'lint': return cmdLint(rest);
+    case 'return': return cmdReturn(rest);
     case 'lock': return cmdLock(rest);
     case 'withdraw': return cmdWithdraw(rest);
     case 'requalify': return cmdRequalify(rest);
