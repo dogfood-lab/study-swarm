@@ -1,0 +1,71 @@
+name: CI
+
+# The smoke test and the packed-tarball check used to run only at release
+# time (release.yml), so a pull request that broke the CLI or dropped a
+# runtime file from package.json "files" went unnoticed until a tag was
+# pushed. This workflow runs the same two checks on every change to the
+# files they exercise.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - 'PROTOCOL.md'
+      - 'package.json'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'bin/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - 'PROTOCOL.md'
+      - 'package.json'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+
+      - name: Smoke-test the CLI
+        run: node scripts/smoke.mjs
+
+      - name: Verify the packed tarball is runnable
+        run: |
+          set -euo pipefail
+          # The same check release.yml runs before publishing: pack, extract
+          # outside the repository, and run the commands that need shipped
+          # runtime files (PROTOCOL.md, examples/) against those files only.
+          npm pack
+          TARBALL=$(ls -t ./*.tgz | head -1)
+          WORK=$(mktemp -d)
+          tar -xzf "$TARBALL" -C "$WORK"
+          PKG="$WORK/package"
+          node "$PKG/bin/study-swarm.mjs" version
+          node "$PKG/bin/study-swarm.mjs" protocol | grep -q "Step 1"
+          node "$PKG/bin/study-swarm.mjs" lint "$PKG/examples/study-swarm-self.dispatch.md"
+          node "$PKG/bin/study-swarm.mjs" lock --verify \
+            "$PKG/examples/study-swarm-lock.dispatch.md" \
+            --from "$PKG/examples/study-swarm-lock.orchestration.json"
+          rm -f "$TARBALL"
+          echo "OK: packed tarball is runnable from its shipped files only"
