@@ -28,13 +28,31 @@
     }
   ],
   "changes": {
-    "first": true
+    "fileCounts": {
+      "added": 0,
+      "changed": 1,
+      "moved": 0,
+      "parts": 1,
+      "removed": 0
+    },
+    "items": [
+      {
+        "kind": "counts",
+        "sentence": "Nothing structural changed since 2026-09-25; 1 file changed content.",
+        "subjects": []
+      }
+    ],
+    "since": {
+      "commit": "d537ad29d4c7842401ff2b6acf93a6591c82cc45",
+      "generatedAt": "2026-09-25T07:22:06.018Z"
+    },
+    "unchanged": true
   },
   "changesTogether": [
     {
       "a": "bin/study-swarm.mjs",
       "b": "scripts/smoke.mjs",
-      "either": 10,
+      "either": 11,
       "partLabels": [
         "bin",
         "scripts"
@@ -44,17 +62,17 @@
         "scripts"
       ],
       "relation": "none",
-      "shared": 8
+      "shared": 9
     }
   ],
   "changesTogetherNote": [
-    "Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions.",
+    "Confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions.",
     "Window: 180 days; a pair counts from 3 shared commits, since the window holds fewer than 30 qualifying commits."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "d537ad29d4c7842401ff2b6acf93a6591c82cc45",
+  "commit": "ab907f069a04bc66c55783a0127c8a693963ebb9",
   "defaultBranch": "main",
-  "derived": "7 parts, mostly JavaScript (3 files) and TypeScript (2). Work enters through 4 doors; CI and Release each reach 2 parts, and CI is followed because a pull request goes through it. It publishes to npm. People run study-swarm.",
+  "derived": "7 parts, in JavaScript (3 files), CSS (2 files), TypeScript (2 files) and Astro (1 file). Work enters through 4 doors; CI and Release each reach 2 parts, and CI is followed because a pull request goes through it. It publishes to npm. It deploys a site to GitHub Pages. People run study-swarm.",
   "doors": [
     {
       "checks": [],
@@ -139,7 +157,7 @@
         {
           "boundary": "site",
           "depth": 0,
-          "files": 3
+          "files": 5
         }
       ],
       "runs": [
@@ -188,15 +206,16 @@
   "duplicatesLead": null,
   "duplicatesNote": [],
   "edges": [],
+  "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-09-25T07:22:06.018Z",
+  "generatedAt": "2026-09-30T20:06:30.539Z",
   "limits": [
     "6 writes and 31 reads use paths built at run time and are not named here.",
     "110 writes and 20 reads go to a temporary directory, not to this repository.",
     "1 write and 12 reads go to a path their caller passes, not to this repository.",
     "2 reads go to the directory the command is run in or a path their caller passes, not to this repository.",
     "2 reads go to the directory the command is run in, not to this repository.",
-    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions."
+    "Statistics confidence is low: fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions."
   ],
   "mainDoor": ".github/workflows/ci.yml",
   "partLabels": {

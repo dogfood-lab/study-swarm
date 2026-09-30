@@ -51,7 +51,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "bin",
-      "qualifyingSourceCommits": 10,
+      "qualifyingSourceCommits": 11,
       "rebaseline": null
     },
     {
@@ -101,7 +101,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "scripts",
-      "qualifyingSourceCommits": 8,
+      "qualifyingSourceCommits": 9,
       "rebaseline": null
     },
     {
@@ -117,7 +117,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "site",
-      "qualifyingSourceCommits": 3,
+      "qualifyingSourceCommits": 4,
       "rebaseline": null
     }
   ],
@@ -125,8 +125,8 @@
     "definition": "commits is how many commits in the window touch the file, including merges and commits dropped from coupling. lines is added plus deleted in those commits.",
     "files": [
       {
-        "commits": 1,
-        "lines": 71,
+        "commits": 2,
+        "lines": 76,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -213,6 +213,31 @@
         "commits": 1,
         "lines": 0,
         "path": "assets/study-swarm.png"
+      },
+      {
+        "commits": 1,
+        "lines": 84,
+        "path": "atlas/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 30,
+        "path": "atlas/boundaries.yaml"
+      },
+      {
+        "commits": 1,
+        "lines": 236,
+        "path": "atlas/page.json"
+      },
+      {
+        "commits": 1,
+        "lines": 437,
+        "path": "atlas/statistics.json"
+      },
+      {
+        "commits": 1,
+        "lines": 1162,
+        "path": "atlas/structure.json"
       },
       {
         "commits": 25,
@@ -358,44 +383,170 @@
   },
   "confidence": {
     "level": "low",
-    "reason": "fewer than 30 qualifying commits in the window, and fewer than 20 source files reach 10 revisions"
+    "reason": "fewer than 30 qualifying commits in the window, and fewer than 25 source files reach 10 revisions"
   },
-  "generatedAt": "2026-09-25T07:22:06.018Z",
+  "generatedAt": "2026-09-30T20:06:30.539Z",
   "generatedFrom": {
-    "commit": "d537ad29d4c7842401ff2b6acf93a6591c82cc45"
+    "commit": "ab907f069a04bc66c55783a0127c8a693963ebb9"
   },
   "pairs": [
     {
       "a": "README.es.md",
+      "b": "README.fr.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.hi.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.es.md",
       "b": "README.it.md",
-      "either": 5,
-      "shared": 5,
+      "either": 8,
+      "shared": 8,
       "strength": 1
     },
     {
       "a": "README.es.md",
+      "b": "README.ja.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.es.md",
       "b": "README.pt-BR.md",
-      "either": 5,
-      "shared": 5,
+      "either": 8,
+      "shared": 8,
+      "strength": 1
+    },
+    {
+      "a": "README.es.md",
+      "b": "README.zh.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.hi.md",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.it.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.ja.md",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.pt-BR.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.fr.md",
+      "b": "README.zh.md",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.it.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.ja.md",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.pt-BR.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.hi.md",
+      "b": "README.zh.md",
+      "either": 7,
+      "shared": 7,
       "strength": 1
     },
     {
       "a": "README.it.md",
+      "b": "README.ja.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.it.md",
       "b": "README.pt-BR.md",
-      "either": 5,
-      "shared": 5,
+      "either": 8,
+      "shared": 8,
       "strength": 1
+    },
+    {
+      "a": "README.it.md",
+      "b": "README.zh.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.ja.md",
+      "b": "README.pt-BR.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
+    },
+    {
+      "a": "README.ja.md",
+      "b": "README.zh.md",
+      "either": 7,
+      "shared": 7,
+      "strength": 1
+    },
+    {
+      "a": "README.pt-BR.md",
+      "b": "README.zh.md",
+      "either": 8,
+      "shared": 7,
+      "strength": 0.875
     },
     {
       "a": "bin/study-swarm.mjs",
       "b": "scripts/smoke.mjs",
-      "either": 10,
-      "shared": 8,
-      "strength": 0.8
+      "either": 11,
+      "shared": 9,
+      "strength": 0.818182
     }
   ],
   "parameters": {
-    "appliedChangesetLimit": 11.5,
+    "appliedChangesetLimit": 12.75,
     "changeset": 50,
     "changesetFraction": 0.25,
     "cohesionDrop": 0.2,
@@ -404,16 +555,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "both",
-    "headDate": "2026-09-25T00:21:31-07:00",
-    "inScopeFiles": 46,
+    "headDate": "2026-09-25T00:23:54-07:00",
+    "inScopeFiles": 51,
     "pinnedStart": null,
-    "priorFloor": null,
-    "qualifyingCommits": 24,
+    "priorFloor": "fallen",
+    "qualifyingCommits": 29,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-03-29T07:21:31.000Z",
+    "since": "2026-03-29T07:23:54.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
